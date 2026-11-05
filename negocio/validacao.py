@@ -2,14 +2,19 @@
 import re
 from datetime import datetime
 
+from negocio import ErroNegocio
 
-class ErroNegocio(Exception):
-    """Dado inválido ou regra de negócio violada (mensagem pronta para o usuário)."""
+EMAIL_VALIDO = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+TAMANHO_MINIMO_SENHA = 3
 
+PERFIS = {
+    "ADMIN": "Administrador",
+    "RECEPCAO": "Recepção",
+    "MEDICO": "Médico",
+}
 
 def somente_digitos(texto):
     return re.sub(r"\D", "", texto or "")
-
 
 def cpf_valido(cpf):
     d = somente_digitos(cpf)
@@ -41,3 +46,24 @@ def parse_numero(texto, campo):
         return float(texto.strip().replace(",", "."))
     except ValueError:
         raise ErroNegocio(f"{campo} inválido.")
+
+def checa_senha(senha_banco, senha_digitada):
+    resultado_verificacao = senha_banco == senha_digitada
+    print(f"Resultado da verificação {resultado_verificacao}")
+    return resultado_verificacao
+
+def dados_da_sessao(usuario):
+    """O que fica guardado na sessão do Flask enquanto o usuário está logado."""
+    return {
+        "id_usuario": usuario["id_usuario"],
+        "nome": usuario["nome"],
+        "perfil": usuario["perfil"],
+        "id_medico": usuario["id_medico"],
+    }
+
+def validar_nova_senha(senha, confirmacao, erros, campo="senha", campo_confirmacao="confirmacao_senha"):
+    """Confere tamanho e confirmação; os problemas vão para o dicionário `erros`."""
+    if len(senha or "") < TAMANHO_MINIMO_SENHA:
+        erros[campo] = f"A senha precisa ter pelo menos {TAMANHO_MINIMO_SENHA} caracteres."
+    elif senha != confirmacao:
+        erros[campo_confirmacao] = "As senhas não conferem."
