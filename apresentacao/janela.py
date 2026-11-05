@@ -11,8 +11,7 @@ from negocio.validacao import ErroNegocio
 
 PERMISSOES = {
     "ADMIN": ["Início", "Consultas", "Pacientes", "Médicos", "Convênios", "Especialidades", "Procedimentos", "Salas", "Usuários"],
-    "RECEPCAO": ["Início", "Consultas", "Pacientes", "Médicos", "Convênios"],
-    "MEDICO": ["Início", "Consultas", "Pacientes"]
+    "MEDICO": ["Início", "Consultas", "Pacientes", "Salas", "Procedimentos"]
 }
 
 
@@ -302,7 +301,7 @@ def iniciar():
     raiz.geometry("1000x640")
 
     estilo = ttk.Style()
-    # estilo.theme_use("clam")
+
     estilo.configure("TNotebook", tabposition="wn")
     estilo.configure("TNotebook.Tab", padding=[15,8], font=("Helvetica", 10), width=15, anchor="w")
     estilo.map("TNotebook.Tab", background=[
@@ -319,15 +318,21 @@ def iniciar():
         nb = ttk.Notebook(raiz)
         nb.pack(fill="both", expand=True)
 
-        nb.add(AbaInicio(nb), text="Início")
-        nb.add(AbaConsultas(nb), text="Consultas")
-        nb.add(AbaPacientes(nb), text="Pacientes")
-        nb.add(AbaMedicos(nb), text="Médicos")
-        nb.add(AbaConvenios(nb), text="Convênios")
-        nb.add(AbaEspecialidades(nb), text="Especialidades")
-        nb.add(AbaProcedimentos(nb), text="Procedimentos")
-        nb.add(AbaSalas(nb), text="salas")
-        nb.add(AbaUsuarios(nb), text="Usuarios")
+        abas = [
+            ("Início", AbaInicio),
+            ("Consultas", AbaConsultas),
+            ("Pacientes", AbaPacientes),
+            ("Médicos", AbaMedicos),
+            ("Convênios", AbaConvenios),
+            ("Especialidades", AbaEspecialidades),
+            ("Procedimentos", AbaProcedimentos),
+            ("Salas", AbaSalas),
+            ("Usuários", AbaUsuarios),
+        ]
+        permitidas = PERMISSOES.get(usuario["perfil"], [])
+        for nome, classe in abas:
+            if nome in permitidas:
+                nb.add(classe(nb), text=nome)
 
     login = TelaLogin(raiz, abrir_sistema)
     login.pack(fill="both", expand=True)

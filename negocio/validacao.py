@@ -9,7 +9,6 @@ TAMANHO_MINIMO_SENHA = 3
 
 PERFIS = {
     "ADMIN": "Administrador",
-    "RECEPCAO": "Recepção",
     "MEDICO": "Médico",
 }
 
