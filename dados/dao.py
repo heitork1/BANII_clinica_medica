@@ -124,6 +124,40 @@ class ConsultaDAO:
                 "ORDER BY c.data_hora_marcado DESC")
             return _tuplas(cur.fetchall())
 
+class PagamentoDAO:
+    def listar(self, data_ini=None, data_fim=None, forma=None, convenio=None,
+               id_paciente=None, id_medico=None):
+        """Lista pagamentos aplicando só os filtros informados (None = não filtra).
+        Paciente e médico vêm da consulta que originou a conta."""
+        where, params = [], []
+        if data_ini:
+            where.append("pg.data_pagamento >= %s"); params.append(data_ini)
+        if data_fim:
+            where.append("pg.data_pagamento <= %s"); params.append(data_fim)
+        if forma:
+            where.append("pg.forma_pagamento = %s"); params.append(forma)
+        if convenio is not None:
+            where.append("COALESCE(pg.possui_convenio, FALSE) = %s"); params.append(convenio)
+        if id_paciente:
+            where.append("c.id_paciente = %s"); params.append(id_paciente)
+        if id_medico:
+            where.append("c.id_medico = %s"); params.append(id_medico)
+        sql = (
+            "SELECT pg.id_pagamento, to_char(pg.data_pagamento,'DD/MM/YYYY') AS data, "
+            "p.nome, m.nome_medico, pg.forma_pagamento, "
+            "CASE WHEN pg.possui_convenio THEN 'Sim' ELSE 'Não' END AS convenio, "
+            "pg.valor_convenio, pg.valor_pago, pg.id_conta "
+            "FROM pagamento pg "
+            "LEFT JOIN consulta c ON c.id_conta = pg.id_conta "
+            "LEFT JOIN paciente p ON p.id_paciente = c.id_paciente "
+            "LEFT JOIN medico m ON m.id_medico = c.id_medico "
+            + ("WHERE " + " AND ".join(where) + " " if where else "")
+            + "ORDER BY pg.data_pagamento DESC NULLS LAST, pg.id_pagamento DESC")
+        with transacao() as cur:
+            cur.execute(sql, params)
+            return _tuplas(cur.fetchall())
+
+
 COLUNAS = "id_usuario, nome, email, perfil, ativo, id_medico"
 
 class UsuarioDAO:

@@ -5,14 +5,8 @@ from datetime import datetime
 
 from dados.conexao import ErroBanco
 from negocio.agenda import AgendaService, STATUS
-from negocio.servicos import MedicoService, PacienteService, ServicoAutenticacao
+from negocio.servicos import MedicoService, PacienteService, PagamentoService, FORMAS_PAGAMENTO
 from negocio.validacao import ErroNegocio
-
-
-PERMISSOES = {
-    "ADMIN": ["Início", "Consultas", "Pacientes", "Médicos", "Convênios", "Especialidades", "Procedimentos", "Salas", "Usuários"],
-    "MEDICO": ["Início", "Consultas", "Pacientes", "Salas", "Procedimentos"]
-}
 
 
 def executar(acao):
@@ -250,50 +244,83 @@ class AbaConvenios(ttk.Frame):
     def __init__(self, pai):
             super().__init__(pai)
 
-class AbaEspecialidades(ttk.Frame):
+class AbaPagamentos(ttk.Frame):
+    TODOS = "Todos"
+
     def __init__(self, pai):
-            super().__init__(pai)
-
-class AbaProcedimentos(ttk.Frame):
-    def __init__(self, pai):
-            super().__init__(pai)
-
-class AbaSalas(ttk.Frame):
-    def __init__(self, pai):
-            super().__init__(pai)
-
-class AbaUsuarios(ttk.Frame):
-    def __init__(self, pai):
-            super().__init__(pai)
-
-
-class TelaLogin(ttk.Frame):
-    def __init__(self, pai, on_sucesso):
         super().__init__(pai)
-        self.on_sucesso = on_sucesso  
-        self.auth = ServicoAutenticacao()
+        self.svc = PagamentoService()
+        self.pac = PacienteService()
+        self.med = MedicoService()
 
-        centro = ttk.Frame(self)
-        centro.pack(expand=True)
+        f = ttk.LabelFrame(self, text="Filtros")
+        f.pack(fill="x", padx=6, pady=6)
+        self.ini = campo(f, "Data inicial (DD/MM/AAAA)", 0, 15)
+        self.fim = campo(f, "Data final (DD/MM/AAAA)", 1, 15)
 
-        ttk.Label(centro, text="Clínica Médica", font=("Helvetica", 16, "bold")).pack(pady=(0, 16))
+        ttk.Label(f, text="Forma de pagamento").grid(row=2, column=0, sticky="e", padx=4, pady=2)
+        self.forma = ttk.Combobox(f, values=[self.TODOS, *FORMAS_PAGAMENTO], width=15, state="readonly")
+        self.forma.set(self.TODOS)
+        self.forma.grid(row=2, column=1, sticky="w")
 
-        ttk.Label(centro, text="E-mail").pack(anchor="w")
-        self.email = ttk.Entry(centro, width=30)
-        self.email.pack(pady=(0, 10))
-        self.email.focus()
+        ttk.Label(f, text="Com convênio").grid(row=0, column=2, sticky="e", padx=(16, 4), pady=2)
+        self.conv = ttk.Combobox(f, values=[self.TODOS, "Sim", "Não"], width=15, state="readonly")
+        self.conv.set(self.TODOS)
+        self.conv.grid(row=0, column=3, sticky="w")
 
-        ttk.Label(centro, text="Senha").pack(anchor="w")
-        self.senha = ttk.Entry(centro, width=30, show="*")
-        self.senha.pack(pady=(0, 16))
-        self.senha.bind("<Return>", lambda e: self.entrar())
+        ttk.Label(f, text="Paciente").grid(row=1, column=2, sticky="e", padx=(16, 4), pady=2)
+        self.cb_pac = ttk.Combobox(f, width=32, state="readonly")
+        self.cb_pac.grid(row=1, column=3, sticky="w")
 
-        ttk.Button(centro, text="Entrar", command=self.entrar).pack(fill="x")
+        ttk.Label(f, text="Médico").grid(row=2, column=2, sticky="e", padx=(16, 4), pady=2)
+        self.cb_med = ttk.Combobox(f, width=32, state="readonly")
+        self.cb_med.grid(row=2, column=3, sticky="w")
 
-    def entrar(self):
-        usuario = executar(lambda: self.auth.entrar(self.email.get(), self.senha.get()))
-        if usuario:
-            self.on_sucesso(usuario)
+        bt = ttk.Frame(f)
+        bt.grid(row=3, column=1, columnspan=3, sticky="w", pady=4)
+        ttk.Button(bt, text="Filtrar", command=self.atualizar).pack(side="left", padx=(0, 4))
+        ttk.Button(bt, text="Limpar filtros", command=self.limpar).pack(side="left")
+
+        self.tab = tabela(self, ("ID", "Data", "Paciente", "Médico", "Forma", "Convênio",
+                                 "Valor convênio", "Valor pago", "Conta"),
+                          (40, 85, 170, 170, 80, 70, 100, 90, 50))
+        self.lbl_total = ttk.Label(self, text="", font=("Helvetica", 10, "bold"))
+        self.lbl_total.pack(anchor="e", padx=10, pady=(0, 6))
+        self.carregar_opcoes()
+        self.atualizar()
+
+    def carregar_opcoes(self):
+        r = executar(lambda: (self.pac.opcoes(), self.med.opcoes()))
+        if r is None:
+            return
+        self.cb_pac["values"] = [self.TODOS] + [f"{i} - {n}" for i, n in r[0]]
+        self.cb_med["values"] = [self.TODOS] + [f"{i} - {n}" for i, n in r[1]]
+        self.cb_pac.set(self.TODOS)
+        self.cb_med.set(self.TODOS)
+
+    def _id(self, combo):
+        t = combo.get()
+        return None if not t or t == self.TODOS else id_de(t)
+
+    def limpar(self):
+        self.ini.delete(0, "end")
+        self.fim.delete(0, "end")
+        for c in (self.forma, self.conv, self.cb_pac, self.cb_med):
+            c.set(self.TODOS)
+        self.atualizar()
+
+    def atualizar(self):
+        sem = lambda c: "" if c.get() == self.TODOS else c.get()
+        linhas = executar(lambda: self.svc.listar(
+            self.ini.get(), self.fim.get(), sem(self.forma), sem(self.conv),
+            self._id(self.cb_pac), self._id(self.cb_med)))
+        if linhas is None:
+            return
+        preencher(self.tab, linhas)
+        total = self.svc.total_pago(linhas)
+        self.lbl_total.config(
+            text=f"{len(linhas)} pagamento(s) – Total pago: R$ {total:,.2f}"
+                 .replace(",", "X").replace(".", ",").replace("X", "."))
 
 def iniciar():
     raiz = tk.Tk()
@@ -311,30 +338,18 @@ def iniciar():
          "#E0E0E0")],
          
     )
-    def abrir_sistema(usuario):
-        login.destroy() 
-        raiz.title(f"Clínica Médica - {usuario['nome']} ({usuario['perfil']})")
+    nb = ttk.Notebook(raiz)
+    nb.pack(fill="both", expand=True)
 
-        nb = ttk.Notebook(raiz)
-        nb.pack(fill="both", expand=True)
-
-        abas = [
-            ("Início", AbaInicio),
-            ("Consultas", AbaConsultas),
-            ("Pacientes", AbaPacientes),
-            ("Médicos", AbaMedicos),
-            ("Convênios", AbaConvenios),
-            ("Especialidades", AbaEspecialidades),
-            ("Procedimentos", AbaProcedimentos),
-            ("Salas", AbaSalas),
-            ("Usuários", AbaUsuarios),
-        ]
-        permitidas = PERMISSOES.get(usuario["perfil"], [])
-        for nome, classe in abas:
-            if nome in permitidas:
-                nb.add(classe(nb), text=nome)
-
-    login = TelaLogin(raiz, abrir_sistema)
-    login.pack(fill="both", expand=True)
+    abas = [
+        ("Início", AbaInicio),
+        ("Consultas", AbaConsultas),
+        ("Pacientes", AbaPacientes),
+        ("Médicos", AbaMedicos),
+        ("Convênios", AbaConvenios),
+        ("Pagamentos", AbaPagamentos),
+    ]
+    for nome, classe in abas:
+        nb.add(classe(nb), text=nome)
 
     raiz.mainloop()

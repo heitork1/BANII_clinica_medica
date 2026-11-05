@@ -1,7 +1,7 @@
 """Camada de negócio: serviços de pacientes e médicos."""
 import psycopg2
 
-from dados.dao import PacienteDAO, MedicoDAO, SalaDAO, UsuarioDAO
+from dados.dao import PacienteDAO, MedicoDAO, SalaDAO, UsuarioDAO, PagamentoDAO
 from negocio import ErroValidacao, erro_do_banco
 from .modelos import Paciente, Medico
 from .validacao import EMAIL_VALIDO, PERFIS, ErroNegocio, checa_senha, cpf_valido, dados_da_sessao, parse_data, parse_numero, somente_digitos, validar_nova_senha
@@ -65,6 +65,30 @@ class MedicoService:
 
     def salas_opcoes(self):
         return self.salas.opcoes()
+
+FORMAS_PAGAMENTO = ("CARTAO", "PIX", "DINHEIRO")
+
+
+class PagamentoService:
+    def __init__(self):
+        self.dao = PagamentoDAO()
+
+    def listar(self, data_ini="", data_fim="", forma="", convenio="", id_paciente=None, id_medico=None):
+        """Filtros vazios são ignorados. convenio: "Sim", "Não" ou vazio (todos)."""
+        ini = parse_data(data_ini) if data_ini.strip() else None
+        fim = parse_data(data_fim) if data_fim.strip() else None
+        if ini and fim and ini > fim:
+            raise ErroNegocio("A data inicial não pode ser maior que a data final.")
+        if forma and forma not in FORMAS_PAGAMENTO:
+            raise ErroNegocio("Forma de pagamento inválida.")
+        conv = {"Sim": True, "Não": False}.get(convenio)
+        return self.dao.listar(ini, fim, forma or None, conv, id_paciente, id_medico)
+
+    @staticmethod
+    def total_pago(linhas):
+        """Soma a coluna 'Valor pago' (índice 7) das linhas exibidas."""
+        return sum(float(l[7] or 0) for l in linhas)
+
 
 class ServicoAutenticacao:
     def __init__(self):
