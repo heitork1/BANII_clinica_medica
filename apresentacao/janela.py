@@ -1,6 +1,7 @@
 """Camada de apresentação (Tkinter): só captura entradas e exibe resultados."""
 import tkinter as tk
 from tkinter import ttk, messagebox
+from datetime import datetime
 
 from dados.conexao import ErroBanco
 from negocio.agenda import AgendaService, STATUS
@@ -42,6 +43,52 @@ def campo(pai, rotulo, linha, largura=30):
 def id_de(texto):
     return int(texto.split(" - ")[0]) if texto else None
 
+class AbaInicio(ttk.Frame):
+    def __init__(self, pai):
+            super().__init__(pai)
+            self.pai = pai
+
+            hoje = datetime.now()
+            dia_extenso = f"{hoje.day}/{hoje.month}/{hoje.year}"
+
+            saudacao = "Bom dia!" if hoje.hour < 12 else ("Boa tarde!" if hoje.hour < 18 else "Boa noite!")
+            topo = ttk.Frame(self)
+            topo.pack(fill="x", padx=16, pady=(16,12))
+
+            lbl_saudacao = ttk.Frame(topo)
+            lbl_saudacao.pack(side="left")
+            ttk.Label(lbl_saudacao, text=saudacao, font=("Helvetica", 15, "bold")).pack(anchor="w")
+            ttk.Label(lbl_saudacao, text=dia_extenso, font=("Helvetica", 10), foreground="#666666").pack(anchor="w", pady=(2,0))
+
+            botoes_topo = ttk.Frame(topo)
+            botoes_topo.pack(side="right")
+
+            ttk.Button(botoes_topo, text="+ Novo paciente", command=lambda: self.pai.select(2)).pack(side="left", padx=4)
+            ttk.Button(botoes_topo, text="+ Nova consulta", command=lambda: self.pai.select(1)).pack(side="left", padx=4)
+
+            ttk.Separator(self, orient="horizontal").pack(fill="x", padx=16, pady=8) 
+
+            card = ttk.LabelFrame(self, text="Consultas de hoje ", padding=14)
+            card.pack(fill="x", padx=16, pady=10)
+
+            card_topo = ttk.Frame(card)
+            card_topo.pack(fill="x", pady=(0,10))
+
+            ttk.Label(card_topo, text="Resumo do dia", font=("Helvetica", 10, "bold")).pack(side="left")
+            ttk.Button(card_topo, text="Abrir agenda →", command=lambda: self.pai.select(1)).pack(side="right")
+
+            corpo_vazio = ttk.Frame(card)
+            corpo_vazio.pack(fill="both", expand=True, pady=25)
+
+            ttk.Label(
+                corpo_vazio,
+                text="Nenhuma consulta marcada para hoje",
+                font=("Helvetica", 10, "italic"),
+                foreground="#555555"
+            ).pack(pady=(0,10))
+
+            ttk.Button(corpo_vazio, text="Marcar consulta", command=lambda: self.pai.select(1)).pack()
+                
 
 class AbaPacientes(ttk.Frame):
     def __init__(self, pai):
@@ -193,14 +240,54 @@ class AbaConsultas(ttk.Frame):
         executar(lambda: self.agenda.mudar_status(id_c, self.st.get()))
         self.atualizar()
 
+class AbaConvenios(ttk.Frame):
+    def __init__(self, pai):
+            super().__init__(pai)
+
+class AbaEspecialidades(ttk.Frame):
+    def __init__(self, pai):
+            super().__init__(pai)
+
+class AbaProcedimentos(ttk.Frame):
+    def __init__(self, pai):
+            super().__init__(pai)
+
+class AbaSalas(ttk.Frame):
+    def __init__(self, pai):
+            super().__init__(pai)
+
+class AbaUsuarios(ttk.Frame):
+    def __init__(self, pai):
+            super().__init__(pai)
 
 def iniciar():
     raiz = tk.Tk()
     raiz.title("Clínica Médica")
     raiz.geometry("1000x640")
+
+    estilo = ttk.Style()
+    # estilo.theme_use("clam")
+    estilo.configure("TNotebook", tabposition="wn")
+    estilo.configure("TNotebook.Tab", padding=[15,8], font=("Helvetica", 10), width=15, anchor="w")
+    estilo.map("TNotebook.Tab", background=[
+        ("selected", 
+         "#3A3A3A"),
+        ("!selected",
+         "#E0E0E0")],
+         
+    )
     nb = ttk.Notebook(raiz)
     nb.pack(fill="both", expand=True)
+    
+    nb.add(AbaInicio(nb), text="Início")
+    nb.add(AbaConsultas(nb), text="Consultas")
     nb.add(AbaPacientes(nb), text="Pacientes")
     nb.add(AbaMedicos(nb), text="Médicos")
-    nb.add(AbaConsultas(nb), text="Consultas")
+    nb.add(AbaConvenios(nb), text="Convênios")
+    nb.add(AbaEspecialidades(nb), text="Especialidades")
+    nb.add(AbaProcedimentos(nb), text="Procedimentos")
+    nb.add(AbaSalas(nb), text="salas") 
+    nb.add(AbaUsuarios (nb), text="Usuarios")                     
+    
+    
     raiz.mainloop()

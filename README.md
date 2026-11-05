@@ -21,3 +21,7 @@ barrados pelos gatilhos do banco e a mensagem aparece na tela.
 5. `python main.py`
 
 Ordem de uso: cadastre um médico (com horários), um paciente e então agende a consulta.
+
+
+Tutorial de Tkinter:
+https://www.pythontutorial.net/tkinter/

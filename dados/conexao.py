@@ -13,9 +13,9 @@ def _config():
     return dict(
         host=os.getenv("PGHOST", "localhost"),
         port=os.getenv("PGPORT", "5432"),
-        dbname=os.getenv("PGDATABASE", "clinica"),
+        dbname=os.getenv("PGDATABASE", "clinicaMedica"),
         user=os.getenv("PGUSER", "postgres"),
-        password=os.getenv("PGPASSWORD", "postgres"),
+        password=os.getenv("PGPASSWORD", "admin"), #essa é a senha do meu banco
     )
 
 
