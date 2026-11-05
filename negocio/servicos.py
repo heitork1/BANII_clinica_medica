@@ -62,3 +62,7 @@ class MedicoService:
 
     def salas_opcoes(self):
         return self.salas.opcoes()
+
+    class ServicoAutenticacao:
+        def __init__(self):
+            self.usuario_dao = 

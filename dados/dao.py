@@ -118,3 +118,11 @@ class ConsultaDAO:
                 "LEFT JOIN sala s USING (id_sala) LEFT JOIN conta ct USING (id_conta) "
                 "ORDER BY c.data_hora_marcado DESC")
             return cur.fetchall()
+
+COLUNAS = "id_usuario, nome, email, perfil, ativo, id_medico"
+
+class usuarioDAO:
+    def listar(self):
+        with transacao() as cur:
+            cur.execute(f"SELECT {COLUNAS} FROM usuario ORDER BY ativo DESC, nome")
+            return cur.fetchall()

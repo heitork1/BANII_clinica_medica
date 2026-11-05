@@ -135,3 +135,16 @@ CREATE TABLE consulta_procedimento (
 
 	PRIMARY KEY (id_consulta, id_procedimento)
 );
+
+CREATE TABLE usuario (
+	id_usuario SERIAL PRIMARY KEY,
+	nome VARCHAR(100) NOT NULL,
+	email VARCHAR(100) UNIQUE NOT NULL,
+	senha_hash VARCHAR(255) NOT NULL,
+	perfil VARCHAR(10) NOT NULL
+		CHECK (perfil IN ('ADMIN', 'RECEPCAO', 'MEDICO')),
+	ativo BOOLEAN NOT NULL DEFAULT TRUE,
+	id_medico INTEGER UNIQUE REFERENCES medico(id_medico),
+
+	CHECK (perfil <> 'MEDICO' OR id_medico IS NOT NULL)
+);
