@@ -46,13 +46,10 @@ def parse_numero(texto, campo):
     except ValueError:
         raise ErroNegocio(f"{campo} inválido.")
 
-def checa_senha(senha_banco, senha_digitada):
-    resultado_verificacao = senha_banco == senha_digitada
-    print(f"Resultado da verificação {resultado_verificacao}")
-    return resultado_verificacao
+def checa_senha(senha_banco, senha_digitada):    
+    return senha_banco == senha_digitada 
 
 def dados_da_sessao(usuario):
-    """O que fica guardado na sessão do Flask enquanto o usuário está logado."""
     return {
         "id_usuario": usuario["id_usuario"],
         "nome": usuario["nome"],

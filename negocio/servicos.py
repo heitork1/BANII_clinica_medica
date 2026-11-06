@@ -97,9 +97,7 @@ class ServicoAutenticacao:
     def entrar(self, email, senha):
         """Confere as credenciais e devolve os dados para a sessão."""
         usuario = self.usuario_dao.buscar_para_login((email or "").strip())
-        print(f"O usuario é: {usuario}")
-        if not usuario or not checa_senha(usuario["senha_hash"], senha or ""):
-            
+        if not usuario or not checa_senha(usuario["senha_hash"], senha or ""):            
             raise ErroNegocio("E-mail ou senha incorretos.")
         if not usuario["ativo"]:
             raise ErroNegocio("Este usuário está desativado. Procure o administrador do sistema.")

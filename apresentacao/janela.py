@@ -5,9 +5,13 @@ from datetime import datetime
 
 from dados.conexao import ErroBanco
 from negocio.agenda import AgendaService, STATUS
-from negocio.servicos import MedicoService, PacienteService, PagamentoService, FORMAS_PAGAMENTO
+from negocio.servicos import MedicoService, PacienteService, PagamentoService, FORMAS_PAGAMENTO, ServicoAutenticacao
 from negocio.validacao import ErroNegocio
 
+PERMISSOES = {
+    "ADMIN": ["Início", "Consultas", "Pacientes", "Médicos", "Convênios", "Pagamentos"],
+    "MEDICO": ["Início", "Consultas", "Pacientes"]
+}
 
 def executar(acao):
     """Roda uma ação e mostra erros de negócio/banco numa caixa de mensagem."""
@@ -322,6 +326,32 @@ class AbaPagamentos(ttk.Frame):
             text=f"{len(linhas)} pagamento(s) – Total pago: R$ {total:,.2f}"
                  .replace(",", "X").replace(".", ",").replace("X", "."))
 
+class TelaLogin(ttk.Frame):
+    def __init__(self, pai, on_sucesso):
+        super().__init__(pai)
+        self.on_sucesso = on_sucesso  
+        self.auth = ServicoAutenticacao()
+
+        centro = ttk.Frame(self)
+        centro.pack(expand=True)
+
+        ttk.Label(centro, text="Clínica Médica", font=("Helvetica", 16, "bold")).pack(pady=(0, 16))
+
+        ttk.Label(centro, text="E-mail").pack(anchor="w")
+        self.email = ttk.Entry(centro, width=30)
+        self.email.pack(pady=(0, 10))
+        self.email.focus()
+
+        ttk.Label(centro, text="Senha").pack(anchor="w")
+        self.senha = ttk.Entry(centro, width=30, show="*")
+        self.senha.pack(pady=(0, 16))
+        self.senha.bind("<Return>", lambda e: self.entrar())
+        ttk.Button(centro, text="Entrar", command=self.entrar).pack(fill="x")
+
+    def entrar(self):
+        usuario = executar(lambda: self.auth.entrar(self.email.get(), self.senha.get()))
+        if usuario:
+            self.on_sucesso(usuario)
 def iniciar():
     raiz = tk.Tk()
     raiz.title("Clínica Médica")
@@ -336,20 +366,30 @@ def iniciar():
          "#3A3A3A"),
         ("!selected",
          "#E0E0E0")],
-         
     )
-    nb = ttk.Notebook(raiz)
-    nb.pack(fill="both", expand=True)
 
-    abas = [
-        ("Início", AbaInicio),
-        ("Consultas", AbaConsultas),
-        ("Pacientes", AbaPacientes),
-        ("Médicos", AbaMedicos),
-        ("Convênios", AbaConvenios),
-        ("Pagamentos", AbaPagamentos),
-    ]
-    for nome, classe in abas:
-        nb.add(classe(nb), text=nome)
+    def abrir_sistema(usuario):
+        login.destroy() 
+        raiz.title(f"Clínica Médica - {usuario['nome']} ({usuario['perfil']})")
+
+        nb = ttk.Notebook(raiz)
+        nb.pack(fill="both", expand=True)
+
+        abas = [
+            ("Início", AbaInicio),
+            ("Consultas", AbaConsultas),
+            ("Pacientes", AbaPacientes),
+            ("Médicos", AbaMedicos),
+            ("Convênios", AbaConvenios),
+            ("Pagamentos", AbaPagamentos),
+        ]
+        permitidas = PERMISSOES.get(usuario["perfil"], [])
+        for nome, classe in abas:
+            if nome in permitidas:
+                nb.add(classe(nb), text=nome)
+
+    login = TelaLogin(raiz, abrir_sistema)
+    login.pack(fill="both", expand=True)
+
 
     raiz.mainloop()
