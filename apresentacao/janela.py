@@ -14,7 +14,9 @@ PERMISSOES = {
 }
 
 def executar(acao):
-    """Roda uma ação e mostra erros de negócio/banco numa caixa de mensagem."""
+    """Chama `acao` (uma função sem argumentos) e devolve o resultado dela.
+    Se lançar ErroNegocio/ErroBanco, mostra a mensagem numa caixa e devolve None.
+    Não agenda nada por si: só protege a chamada com try/except."""
     try:
         return acao()
     except (ErroNegocio, ErroBanco) as e:
@@ -45,6 +47,7 @@ def campo(pai, rotulo, linha, largura=30):
 
 
 def id_de(texto):
+    """Extrai o id de um item de combo no formato '12 - Maria' -> 12 (vazio -> None)."""
     return int(texto.split(" - ")[0]) if texto else None
 
 class AbaInicio(ttk.Frame):
@@ -123,19 +126,26 @@ class AbaPacientes(ttk.Frame):
         self.atualizar()
 
     def cadastrar(self):
-        r = executar(lambda: self.svc.cadastrar(
-            self.nome.get(), self.cpf.get(), self.nasc.get(), self.rg.get(), self.sexo.get(),
-            self.end.get(), self.email.get(), self.tels.get()))
-        if r:
+        def chamar_servico():
+            # PacienteService.cadastrar valida os dados e grava no banco
+            return self.svc.cadastrar(
+                self.nome.get(), self.cpf.get(), self.nasc.get(), self.rg.get(), self.sexo.get(),
+                self.end.get(), self.email.get(), self.tels.get())
+
+        paciente_id = executar(chamar_servico)
+        if paciente_id:
             for e in (self.nome, self.cpf, self.nasc, self.rg, self.end, self.email, self.tels):
                 e.delete(0, "end")
             messagebox.showinfo("Pronto", "Paciente cadastrado.")
             self.atualizar()
 
     def atualizar(self):
-        l = executar(lambda: self.svc.listar(self.busca.get()))
-        if l is not None:
-            preencher(self.tab, l)
+        def buscar_pacientes():
+            return self.svc.listar(self.busca.get())
+
+        pacientes = executar(buscar_pacientes)
+        if pacientes is not None:
+            preencher(self.tab, pacientes)
 
 
 class AbaMedicos(ttk.Frame):
@@ -179,9 +189,14 @@ class AbaMedicos(ttk.Frame):
     def cadastrar(self):
         esp = [self.esp[i][0] for i in self.lb_esp.curselection()]
         hor = [self.hor[i][0] for i in self.lb_hor.curselection()]
-        r = executar(lambda: self.svc.cadastrar(self.nome.get(), self.crm.get(), self.pct.get(),
-                                                self.tel.get(), esp, hor))
-        if r:
+
+        def chamar_servico():
+            # MedicoService.cadastrar valida os dados e grava no banco
+            return self.svc.cadastrar(self.nome.get(), self.crm.get(), self.pct.get(),
+                                      self.tel.get(), esp, hor)
+
+        medico_id = executar(chamar_servico)
+        if medico_id:
             for e in (self.nome, self.crm, self.pct, self.tel):
                 e.delete(0, "end")
             messagebox.showinfo("Pronto", "Médico cadastrado.")
@@ -204,7 +219,7 @@ class AbaConsultas(ttk.Frame):
             self.cb[nome] = c
         self.dh = campo(f, "Data e hora* (DD/MM/AAAA HH:MM)", 3, 20)
         self.valor = campo(f, "Valor da consulta (R$)*", 4, 12)
-        ttk.Button(f, text="Agendar", command=self.agendar).grid(row=5, column=1, sticky="w", pady=4)
+        ttk.Button(f, text="Agendar", command=self.ao_clicar_agendar).grid(row=5, column=1, sticky="w", pady=4)
 
         b = ttk.Frame(self)
         b.pack(fill="x", padx=6)
@@ -227,11 +242,21 @@ class AbaConsultas(ttk.Frame):
             self.cb[nome]["values"] = [f"{i} - {n}" for i, n in dados]
         preencher(self.tab, r[3])
 
-    def agendar(self):
-        r = executar(lambda: self.agenda.agendar(
-            id_de(self.cb["Paciente"].get()), id_de(self.cb["Médico"].get()),
-            id_de(self.cb["Sala"].get()), self.dh.get(), self.valor.get()))
-        if r:
+    def ao_clicar_agendar(self):
+        """Handler do botão 'Agendar': lê o formulário, chama o serviço e atualiza a tela."""
+        # Os combos guardam "12 - Maria"; id_de extrai só o número 12.
+        id_paciente = id_de(self.cb["Paciente"].get())
+        id_medico = id_de(self.cb["Médico"].get())
+        id_sala = id_de(self.cb["Sala"].get())
+
+        def chamar_servico():
+            # AgendaService.agendar valida os dados e grava no banco (ConsultaDAO.inserir)
+            return self.agenda.agendar(id_paciente, id_medico, id_sala,
+                                       self.dh.get(), self.valor.get())
+
+        # executar() roda chamar_servico e mostra caixa de erro se ErroNegocio/ErroBanco
+        consulta_id = executar(chamar_servico)
+        if consulta_id:
             messagebox.showinfo("Pronto", "Consulta agendada.")
             self.atualizar()
 
@@ -241,7 +266,12 @@ class AbaConsultas(ttk.Frame):
             messagebox.showwarning("Atenção", "Selecione uma consulta e um status.")
             return
         id_c = int(self.tab.item(sel[0])["values"][0])
-        executar(lambda: self.agenda.mudar_status(id_c, self.st.get()))
+        novo_status = self.st.get()
+
+        def chamar_servico():
+            self.agenda.mudar_status(id_c, novo_status)
+
+        executar(chamar_servico)
         self.atualizar()
 
 class AbaConvenios(ttk.Frame):
@@ -294,11 +324,15 @@ class AbaPagamentos(ttk.Frame):
         self.atualizar()
 
     def carregar_opcoes(self):
-        r = executar(lambda: (self.pac.opcoes(), self.med.opcoes()))
+        def buscar_opcoes():
+            return self.pac.opcoes(), self.med.opcoes()
+
+        r = executar(buscar_opcoes)
         if r is None:
             return
-        self.cb_pac["values"] = [self.TODOS] + [f"{i} - {n}" for i, n in r[0]]
-        self.cb_med["values"] = [self.TODOS] + [f"{i} - {n}" for i, n in r[1]]
+        pacientes, medicos = r
+        self.cb_pac["values"] = [self.TODOS] + [f"{i} - {n}" for i, n in pacientes]
+        self.cb_med["values"] = [self.TODOS] + [f"{i} - {n}" for i, n in medicos]
         self.cb_pac.set(self.TODOS)
         self.cb_med.set(self.TODOS)
 
@@ -314,10 +348,15 @@ class AbaPagamentos(ttk.Frame):
         self.atualizar()
 
     def atualizar(self):
-        sem = lambda c: "" if c.get() == self.TODOS else c.get()
-        linhas = executar(lambda: self.svc.listar(
-            self.ini.get(), self.fim.get(), sem(self.forma), sem(self.conv),
-            self._id(self.cb_pac), self._id(self.cb_med)))
+        def valor_do_filtro(combo):
+            return "" if combo.get() == self.TODOS else combo.get()
+
+        def buscar_pagamentos():
+            return self.svc.listar(
+                self.ini.get(), self.fim.get(), valor_do_filtro(self.forma), valor_do_filtro(self.conv),
+                self._id(self.cb_pac), self._id(self.cb_med))
+
+        linhas = executar(buscar_pagamentos)
         if linhas is None:
             return
         preencher(self.tab, linhas)
@@ -349,7 +388,10 @@ class TelaLogin(ttk.Frame):
         ttk.Button(centro, text="Entrar", command=self.entrar).pack(fill="x")
 
     def entrar(self):
-        usuario = executar(lambda: self.auth.entrar(self.email.get(), self.senha.get()))
+        def chamar_servico():
+            return self.auth.entrar(self.email.get(), self.senha.get())
+
+        usuario = executar(chamar_servico)
         if usuario:
             self.on_sucesso(usuario)
 def iniciar():
