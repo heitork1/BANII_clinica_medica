@@ -89,6 +89,37 @@ class PagamentoService:
         """Soma a coluna 'Valor pago' (índice 7) das linhas exibidas."""
         return sum(float(l[7] or 0) for l in linhas)
 
+    def contas_em_aberto(self):
+        """Devolve [(id_conta, texto)] das contas que ainda têm saldo a pagar (para o combo do modal)."""
+        opcoes = []
+        for c in self.dao.contas_em_aberto(limite=100):
+            data = c["data_hora_marcado"].strftime("%d/%m/%Y")
+            saldo = f"{c['saldo']:.2f}".replace(".", ",")
+            opcoes.append((c["id_conta"], f"{c['nome_paciente']} - {data} - saldo R$ {saldo}"))
+        return opcoes
+
+    def registrar(self, id_conta, data, forma, valor_pago, possui_convenio, valor_convenio):
+        """Valida o que foi digitado e grava o pagamento. Devolve o id do pagamento."""
+        if not id_conta:
+            raise ErroNegocio("Selecione a conta.")
+        if forma not in FORMAS_PAGAMENTO:
+            raise ErroNegocio("Selecione a forma de pagamento.")
+        data_pagamento = parse_data(data)
+        # Campo vazio vale 0 (ex.: o convênio pagou tudo e o paciente não pagou nada).
+        pago = parse_numero(valor_pago, "Valor pago") if valor_pago.strip() else 0
+        convenio = 0
+        if possui_convenio and valor_convenio.strip():
+            convenio = parse_numero(valor_convenio, "Valor do convênio")
+        # As regras de saldo e carteirinha são conferidas pelo gatilho do banco.
+        return self.dao.inserir({
+            "data_pagamento": data_pagamento,
+            "valor_pago": pago,
+            "forma_pagamento": forma,
+            "possui_convenio": possui_convenio,
+            "valor_convenio": convenio,
+            "id_conta": id_conta,
+        })
+
 
 class ServicoAutenticacao:
     def __init__(self):

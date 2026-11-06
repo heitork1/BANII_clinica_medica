@@ -278,6 +278,72 @@ class AbaConvenios(ttk.Frame):
     def __init__(self, pai):
             super().__init__(pai)
 
+class JanelaNovoPagamento(tk.Toplevel):
+    """Janela (modal) para registrar um pagamento de uma conta que ainda tem saldo."""
+
+    def __init__(self, pai, ao_salvar):
+        super().__init__(pai)
+        self.title("Novo pagamento")
+        self.transient(pai.winfo_toplevel())  # fica na frente da janela principal
+        self.grab_set()                       # bloqueia a janela de trás até fechar esta
+        self.svc = PagamentoService()
+        self.ao_salvar = ao_salvar            # função chamada depois de salvar (atualiza a lista)
+
+        f = ttk.Frame(self)
+        f.pack(padx=12, pady=12)
+
+        ttk.Label(f, text="Conta*").grid(row=0, column=0, sticky="e", padx=4, pady=2)
+        self.cb_conta = ttk.Combobox(f, width=50, state="readonly")
+        self.cb_conta.grid(row=0, column=1, sticky="w")
+
+        self.data = campo(f, "Data (DD/MM/AAAA)*", 1, 15)
+        self.data.insert(0, datetime.today().strftime("%d/%m/%Y"))
+
+        ttk.Label(f, text="Forma de pagamento*").grid(row=2, column=0, sticky="e", padx=4, pady=2)
+        self.forma = ttk.Combobox(f, values=FORMAS_PAGAMENTO, width=15, state="readonly")
+        self.forma.grid(row=2, column=1, sticky="w")
+
+        self.valor_pago = campo(f, "Valor pago pelo paciente (R$)", 3, 15)
+
+        self.tem_convenio = tk.BooleanVar(value=False)
+        # command: toda vez que a caixa é marcada/desmarcada, chama self.ajustar_campo_convenio
+        ttk.Checkbutton(f, text="Pago com convênio", variable=self.tem_convenio,
+                        command=self.ajustar_campo_convenio).grid(row=4, column=1, sticky="w", pady=2)
+        self.valor_convenio = campo(f, "Valor pago pelo convênio (R$)", 5, 15)
+        self.ajustar_campo_convenio()  # começa desabilitado, porque a caixa começa desmarcada
+
+        ttk.Button(f, text="Salvar", command=self.salvar).grid(row=6, column=1, sticky="w", pady=8)
+
+        self.carregar_contas()
+
+    def ajustar_campo_convenio(self):
+        """Caixa marcada: o campo aceita texto. Caixa desmarcada: limpa e bloqueia o campo."""
+        if self.tem_convenio.get():
+            self.valor_convenio.config(state="normal")
+        else:
+            self.valor_convenio.delete(0, "end")
+            self.valor_convenio.config(state="disabled")
+
+    def carregar_contas(self):
+        contas = executar(self.svc.contas_em_aberto)
+        if contas is None:
+            contas = []
+        # Cada item do combo fica "12 - Maria - 05/11/2026 - saldo R$ 100,00"; id_de pega o 12.
+        self.cb_conta["values"] = [f"{i} - {texto}" for i, texto in contas]
+
+    def salvar(self):
+        def chamar_servico():
+            return self.svc.registrar(
+                id_de(self.cb_conta.get()), self.data.get(), self.forma.get(),
+                self.valor_pago.get(), self.tem_convenio.get(), self.valor_convenio.get())
+
+        pagamento_id = executar(chamar_servico)
+        if pagamento_id:
+            messagebox.showinfo("Pronto", "Pagamento registrado.", parent=self)
+            self.ao_salvar()
+            self.destroy()
+
+
 class AbaPagamentos(ttk.Frame):
     TODOS = "Todos"
 
@@ -287,8 +353,14 @@ class AbaPagamentos(ttk.Frame):
         self.pac = PacienteService()
         self.med = MedicoService()
 
-        f = ttk.LabelFrame(self, text="Filtros")
-        f.pack(fill="x", padx=6, pady=6)
+        # Linha de cima: filtros à esquerda e o botão "Novo Pagamento" ao lado deles
+        topo = ttk.Frame(self)
+        topo.pack(fill="x", padx=6, pady=6)
+        f = ttk.LabelFrame(topo, text="Filtros")
+        f.pack(side="left")
+        # expand=True: o botão ganha todo o espaço que sobra à direita dos filtros e fica centralizado nele
+        ttk.Button(topo, text="+Novo Pagamento", command=self.abrir_novo_pagamento).pack(side="left", expand=True)
+
         self.ini = campo(f, "Data inicial (DD/MM/AAAA)", 0, 15)
         self.fim = campo(f, "Data final (DD/MM/AAAA)", 1, 15)
 
@@ -310,6 +382,8 @@ class AbaPagamentos(ttk.Frame):
         self.cb_med = ttk.Combobox(f, width=32, state="readonly")
         self.cb_med.grid(row=2, column=3, sticky="w")
 
+        
+        
         bt = ttk.Frame(f)
         bt.grid(row=3, column=1, columnspan=3, sticky="w", pady=4)
         ttk.Button(bt, text="Filtrar", command=self.atualizar).pack(side="left", padx=(0, 4))
@@ -322,6 +396,10 @@ class AbaPagamentos(ttk.Frame):
         self.lbl_total.pack(anchor="e", padx=10, pady=(0, 6))
         self.carregar_opcoes()
         self.atualizar()
+
+    def abrir_novo_pagamento(self):
+        # Depois de salvar, a janela chama self.atualizar para a lista mostrar o novo pagamento.
+        JanelaNovoPagamento(self, self.atualizar)
 
     def carregar_opcoes(self):
         def buscar_opcoes():

@@ -6,6 +6,9 @@ def _tuplas(linhas):
     """Converte linhas dict em tuplas (formato que a interface antiga espera)."""
     return [tuple(l.values()) for l in linhas]
 
+# Total já pago de uma conta (paciente + convênio); usar com GROUP BY ct.id_conta.
+SOMA_PAGA = "COALESCE(sum(COALESCE(pg.valor_pago, 0) + COALESCE(pg.valor_convenio, 0)), 0)"
+
 
 class PacienteDAO:
     def inserir(self, p):
@@ -131,17 +134,23 @@ class PagamentoDAO:
         Paciente e médico vêm da consulta que originou a conta."""
         where, params = [], []
         if data_ini:
-            where.append("pg.data_pagamento >= %s"); params.append(data_ini)
+            where.append("pg.data_pagamento >= %s"); 
+            params.append(data_ini)
         if data_fim:
-            where.append("pg.data_pagamento <= %s"); params.append(data_fim)
+            where.append("pg.data_pagamento <= %s"); 
+            params.append(data_fim)
         if forma:
-            where.append("pg.forma_pagamento = %s"); params.append(forma)
+            where.append("pg.forma_pagamento = %s"); 
+            params.append(forma)
         if convenio is not None:
-            where.append("COALESCE(pg.possui_convenio, FALSE) = %s"); params.append(convenio)
+            where.append("COALESCE(pg.possui_convenio, FALSE) = %s"); 
+            params.append(convenio)
         if id_paciente:
-            where.append("c.id_paciente = %s"); params.append(id_paciente)
+            where.append("c.id_paciente = %s"); 
+            params.append(id_paciente)
         if id_medico:
-            where.append("c.id_medico = %s"); params.append(id_medico)
+            where.append("c.id_medico = %s"); 
+            params.append(id_medico)
         sql = (
             "SELECT pg.id_pagamento, to_char(pg.data_pagamento,'DD/MM/YYYY') AS data, "
             "p.nome, m.nome_medico, pg.forma_pagamento, "
@@ -157,8 +166,87 @@ class PagamentoDAO:
             cur.execute(sql, params)
             return _tuplas(cur.fetchall())
 
+    # ---- Operações sobre os pagamentos de UMA conta (base do futuro modal de pagamentos) ----
+
+    def buscar_conta(self, id_conta):
+        """Totais da conta: valor, quanto o paciente e o convênio já pagaram, e o saldo."""
+        with transacao() as cur:
+            cur.execute(
+                f"""
+                SELECT ct.id_conta, ct.valor_consulta, ct.valor_procedimento,
+                    COALESCE(ct.valor_total, 0) AS valor_total,
+                    COALESCE(sum(pg.valor_pago), 0) AS pago_paciente,
+                    COALESCE(sum(pg.valor_convenio), 0) AS pago_convenio,
+                    COALESCE(ct.valor_total, 0) - {SOMA_PAGA} AS saldo,
+                    count(pg.id_pagamento) AS quantidade_pagamentos
+                FROM conta ct
+                LEFT JOIN pagamento pg ON pg.id_conta = ct.id_conta
+                WHERE ct.id_conta = %s
+                GROUP BY ct.id_conta
+                """,
+                (id_conta,))
+            return cur.fetchone()
+
+    def listar_por_conta(self, id_conta):
+        """Pagamentos de uma conta, do mais antigo para o mais novo (linhas como dict)."""
+        with transacao() as cur:
+            cur.execute(
+                """
+                SELECT id_pagamento, data_pagamento, valor_pago, forma_pagamento,
+                    possui_convenio, valor_convenio,
+                    COALESCE(valor_pago, 0) + COALESCE(valor_convenio, 0) AS total
+                FROM pagamento
+                WHERE id_conta = %s
+                ORDER BY data_pagamento, id_pagamento
+                """,
+                (id_conta,))
+            return cur.fetchall()
+
+    def inserir(self, dados):
+        """dados: dict com data_pagamento, valor_pago, forma_pagamento, possui_convenio,
+        valor_convenio e id_conta. O gatilho fn_valida_pagamento recusa dados inválidos."""
+        with transacao() as cur:
+            cur.execute(
+                """
+                INSERT INTO pagamento (data_pagamento, valor_pago, forma_pagamento,
+                                       possui_convenio, valor_convenio, id_conta)
+                VALUES (%(data_pagamento)s, %(valor_pago)s, %(forma_pagamento)s,
+                        %(possui_convenio)s, %(valor_convenio)s, %(id_conta)s)
+                RETURNING id_pagamento
+                """,
+                dados)
+            return cur.fetchone()["id_pagamento"]
+
+    def excluir(self, id_pagamento, id_conta):
+        """Apaga o pagamento só se ele pertencer à conta informada. Devolve True se apagou."""
+        with transacao() as cur:
+            cur.execute("DELETE FROM pagamento WHERE id_pagamento = %s AND id_conta = %s",
+                        (id_pagamento, id_conta))
+            return cur.rowcount > 0
+
+    def contas_em_aberto(self, limite=10):
+        """Consultas realizadas cuja conta ainda tem saldo, das mais antigas para as mais novas."""
+        with transacao() as cur:
+            cur.execute(
+                f"""
+                SELECT ct.id_conta, c.id_consulta, c.data_hora_marcado, p.nome AS nome_paciente,
+                    COALESCE(ct.valor_total, 0) - {SOMA_PAGA} AS saldo
+                FROM consulta c
+                JOIN paciente p ON p.id_paciente = c.id_paciente
+                JOIN conta ct ON ct.id_conta = c.id_conta
+                LEFT JOIN pagamento pg ON pg.id_conta = ct.id_conta
+                WHERE c.status = 'REALIZADA'
+                GROUP BY c.id_consulta, p.nome, ct.id_conta
+                HAVING COALESCE(ct.valor_total, 0) - {SOMA_PAGA} > 0
+                ORDER BY c.data_hora_marcado
+                LIMIT %s
+                """,
+                (limite,))
+            return cur.fetchall()
+
 
 COLUNAS = "id_usuario, nome, email, perfil, ativo, id_medico"
+
 
 class UsuarioDAO:
     def listar(self):
