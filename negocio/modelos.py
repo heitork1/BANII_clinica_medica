@@ -32,5 +32,4 @@ class Consulta:
     id_medico: int
     id_sala: int
     data_hora: datetime
-    valor: float
     status: str = "AGENDADA"

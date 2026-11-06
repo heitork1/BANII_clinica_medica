@@ -1,5 +1,5 @@
 """Camada de dados: acesso às tabelas (DAOs). Só SQL, sem regras de negócio."""
-from .conexao import transacao
+from .conexao import transacao, ErroBanco
 
 
 def _tuplas(linhas):
@@ -100,22 +100,24 @@ class SalaDAO:
 
 class ConsultaDAO:
     def inserir(self, c):
-        """Cria a conta e a consulta na mesma transação: se um gatilho recusar, nada é gravado."""
+        """Agenda a consulta (sem conta: ela só é gerada quando a consulta é finalizada)."""
         with transacao() as cur:
-            cur.execute("INSERT INTO conta (valor_procedimento, valor_consulta) VALUES (0, %s) "
-                        "RETURNING id_conta AS id", (c.valor,))
-            id_conta = cur.fetchone()["id"]
             cur.execute(
-                "INSERT INTO consulta (data_hora_marcado, status, id_paciente, id_medico, id_sala, id_conta) "
-                "VALUES (%s,%s,%s,%s,%s,%s) RETURNING id_consulta AS id",
-                (c.data_hora, c.status, c.id_paciente, c.id_medico, c.id_sala, id_conta))
+                "INSERT INTO consulta (data_hora_marcado, status, id_paciente, id_medico, id_sala) "
+                "VALUES (%s,%s,%s,%s,%s) RETURNING id_consulta AS id",
+                (c.data_hora, c.status, c.id_paciente, c.id_medico, c.id_sala))
             return cur.fetchone()["id"]
 
     def atualizar_status(self, id_consulta, status):
         with transacao() as cur:
-            cur.execute("UPDATE consulta SET status = %s, "
-                        "data_hora_realizado = CASE WHEN %s = 'REALIZADA' THEN now() ELSE data_hora_realizado END "
-                        "WHERE id_consulta = %s", (status, status, id_consulta))
+            cur.execute("SELECT status FROM consulta WHERE id_consulta = %s FOR UPDATE", (id_consulta,))
+            atual = cur.fetchone()
+            if atual is None:
+                raise ErroBanco("Consulta não encontrada.")
+            if atual["status"] == "REALIZADA":
+                raise ErroBanco("Esta consulta já foi realizada e a conta já foi gerada: "
+                                "o status não pode mais ser alterado.")
+            cur.execute("UPDATE consulta SET status = %s WHERE id_consulta = %s", (status, id_consulta))
 
     def listar(self):
         with transacao() as cur:
@@ -126,6 +128,80 @@ class ConsultaDAO:
                 "LEFT JOIN sala s USING (id_sala) LEFT JOIN conta ct USING (id_conta) "
                 "ORDER BY c.data_hora_marcado DESC")
             return _tuplas(cur.fetchall())
+
+class ContaDAO:
+    def procedimentos(self):
+        with transacao() as cur:
+            cur.execute("SELECT id_procedimento, descricao, valor FROM procedimento ORDER BY descricao")
+            return cur.fetchall()
+
+    def finalizar_consulta(self, id_consulta, valor_consulta, sintomas, diagnostico, prescricao, itens):
+        """Numa única transação: gera a conta, liga à consulta, marca REALIZADA e grava os procedimentos.
+        O gatilho fn_atualiza_valor_procedimento_conta recalcula conta.valor_procedimento sozinho,
+        por isso a consulta precisa estar ligada à conta ANTES de inserir os procedimentos."""
+        with transacao() as cur:
+            cur.execute("SELECT status, id_conta FROM consulta WHERE id_consulta = %s FOR UPDATE",
+                        (id_consulta,))
+            consulta = cur.fetchone()
+            if consulta is None:
+                raise ErroBanco("Consulta não encontrada.")
+            if consulta["status"] == "REALIZADA":
+                raise ErroBanco("Esta consulta já foi realizada e a conta já foi gerada.")
+
+            id_conta = consulta["id_conta"]
+            if id_conta is None:
+                cur.execute("INSERT INTO conta (valor_procedimento, valor_consulta) VALUES (0, %s) "
+                            "RETURNING id_conta AS id", (valor_consulta,))
+                id_conta = cur.fetchone()["id"]
+            else:  # consulta antiga, que já tinha conta criada no agendamento
+                cur.execute("UPDATE conta SET valor_consulta = %s WHERE id_conta = %s",
+                            (valor_consulta, id_conta))
+
+            cur.execute(
+                "UPDATE consulta SET status = 'REALIZADA', data_hora_realizado = now(), "
+                "sintomas = %s, diagnostico = %s, prescricao = %s, id_conta = %s "
+                "WHERE id_consulta = %s",
+                (sintomas, diagnostico, prescricao, id_conta, id_consulta))
+
+            for id_procedimento, quantidade in itens:
+                # valor_unitario guarda o preço da época: mudar o cadastro depois não altera contas antigas
+                cur.execute(
+                    "INSERT INTO consulta_procedimento (id_consulta, id_procedimento, quantidade, valor_unitario) "
+                    "SELECT %s, id_procedimento, %s, valor FROM procedimento WHERE id_procedimento = %s",
+                    (id_consulta, quantidade, id_procedimento))
+                if cur.rowcount == 0:
+                    raise ErroBanco("Procedimento não encontrado no cadastro.")
+            return id_conta
+
+    def listar(self, situacao=None):
+        """Todas as contas com consulta, paciente, médico, total pago, saldo e situação."""
+        filtro = "WHERE t.situacao = %s" if situacao else ""
+        sql = f"""
+            SELECT * FROM (
+                SELECT ct.id_conta AS conta, c.id_consulta AS consulta,
+                    to_char(c.data_hora_realizado, 'DD/MM/YYYY HH24:MI') AS realizada_em,
+                    p.nome AS paciente, m.nome_medico AS medico,
+                    ct.valor_consulta AS v_consulta, ct.valor_procedimento AS v_procedimentos,
+                    COALESCE(ct.valor_total, 0) AS total,
+                    {SOMA_PAGA} AS pago,
+                    COALESCE(ct.valor_total, 0) - {SOMA_PAGA} AS saldo,
+                    CASE WHEN {SOMA_PAGA} >= COALESCE(ct.valor_total, 0) THEN 'Quitada'
+                         WHEN {SOMA_PAGA} > 0 THEN 'Parcial'
+                         ELSE 'Em aberto' END AS situacao
+                FROM conta ct
+                LEFT JOIN consulta c ON c.id_conta = ct.id_conta
+                LEFT JOIN paciente p ON p.id_paciente = c.id_paciente
+                LEFT JOIN medico m ON m.id_medico = c.id_medico
+                LEFT JOIN pagamento pg ON pg.id_conta = ct.id_conta
+                GROUP BY ct.id_conta, c.id_consulta, p.id_paciente, m.id_medico
+            ) t
+            {filtro}
+            ORDER BY t.conta DESC
+        """
+        with transacao() as cur:
+            cur.execute(sql, (situacao,) if situacao else None)
+            return _tuplas(cur.fetchall())
+
 
 class PagamentoDAO:
     def listar(self, data_ini=None, data_fim=None, forma=None, convenio=None,

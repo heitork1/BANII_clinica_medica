@@ -1,7 +1,7 @@
 """Camada de negócio: serviços de pacientes e médicos."""
 import psycopg2
 
-from dados.dao import PacienteDAO, MedicoDAO, SalaDAO, UsuarioDAO, PagamentoDAO
+from dados.dao import PacienteDAO, MedicoDAO, SalaDAO, UsuarioDAO, PagamentoDAO, ContaDAO
 from negocio import ErroValidacao, erro_do_banco
 from .modelos import Paciente, Medico
 from .validacao import EMAIL_VALIDO, PERFIS, ErroNegocio, checa_senha, cpf_valido, dados_da_sessao, parse_data, parse_numero, somente_digitos, validar_nova_senha
@@ -48,6 +48,8 @@ class MedicoService:
             raise ErroNegocio("O percentual deve estar entre 0 e 100.")
         if not especialidades:
             raise ErroNegocio("Selecione ao menos uma especialidade.")
+        if not horarios:
+            raise ErroNegocio("Selecione ao menos um horário de atendimento.")
         return self.dao.inserir(Medico(nome.strip(), crm.strip(), pct, telefone.strip(),
                                        especialidades, horarios))
 
@@ -65,6 +67,43 @@ class MedicoService:
 
     def salas_opcoes(self):
         return self.salas.opcoes()
+
+SITUACOES_CONTA = ("Em aberto", "Parcial", "Quitada")
+
+
+class ContaService:
+    def __init__(self):
+        self.dao = ContaDAO()
+
+    def procedimentos(self):
+        """Procedimentos cadastrados no banco: lista de dicts (id_procedimento, descricao, valor)."""
+        return self.dao.procedimentos()
+
+    def finalizar_consulta(self, id_consulta, valor_consulta, sintomas, diagnostico, prescricao, itens):
+        """Marca a consulta como REALIZADA e gera a conta dela, numa transação só.
+        itens: lista de (id_procedimento, quantidade). Devolve o id da conta gerada."""
+        if not id_consulta:
+            raise ErroNegocio("Selecione a consulta.")
+        valor = parse_numero(valor_consulta or "", "Valor da consulta")
+        if valor < 0:
+            raise ErroNegocio("O valor da consulta não pode ser negativo.")
+        for _, qtd in itens:
+            if qtd < 1:
+                raise ErroNegocio("A quantidade de cada procedimento deve ser pelo menos 1.")
+        return self.dao.finalizar_consulta(id_consulta, valor, sintomas.strip() or None,
+                                           diagnostico.strip() or None, prescricao.strip() or None, itens)
+
+    def listar(self, situacao=""):
+        """Contas com o quanto já foi pago. situacao: vazio (todas), 'Em aberto', 'Parcial' ou 'Quitada'."""
+        if situacao and situacao not in SITUACOES_CONTA:
+            raise ErroNegocio("Situação inválida.")
+        return self.dao.listar(situacao or None)
+
+    @staticmethod
+    def totais(linhas):
+        """Soma Total (col. 7), Pago (col. 8) e Saldo (col. 9) das linhas exibidas."""
+        return tuple(sum(float(l[i] or 0) for l in linhas) for i in (7, 8, 9))
+
 
 FORMAS_PAGAMENTO = ("CARTAO", "PIX", "DINHEIRO")
 
