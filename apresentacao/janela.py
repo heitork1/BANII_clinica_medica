@@ -855,7 +855,7 @@ def iniciar():
     )
 
     def abrir_sistema(usuario):
-        # login.destroy() 
+        login.destroy() 
         raiz.title(f"Clínica Médica - {usuario['nome']} ({usuario['perfil']})")
 
         nb = ttk.Notebook(raiz)
@@ -880,12 +880,9 @@ def iniciar():
                 aba.ao_exibir()
         nb.bind("<<NotebookTabChanged>>", ao_trocar_de_aba)
 
-    abrir_sistema({"id_usuario": 1,
-            "nome": 'admin',
-            "perfil": 'ADMIN',
-            "id_medico": 'NONE'})
-    # login = TelaLogin(raiz, abrir_sistema)
-    # login.pack(fill="both", expand=True)
+
+    login = TelaLogin(raiz, abrir_sistema)
+    login.pack(fill="both", expand=True)
 
 
     raiz.mainloop()
