@@ -5,89 +5,59 @@
 --ETAPA 3 GATILHOS E FUNÇÕES
 ---================================================================================
 
--- Duração de cada consulta. A aplicação usa o mesmo valor (DURACAO_CONSULTA em negocio/agenda.py).
-CREATE OR REPLACE FUNCTION fn_duracao_consulta()
-RETURNS INTERVAL AS $$
-    SELECT INTERVAL '30 minutes';
-$$ LANGUAGE sql IMMUTABLE;
-
-
--- GATILHO 1: impede consultas sobrepostas do mesmo médico ou na mesma sala.
--- Duas consultas se sobrepõem quando uma começa antes de a outra terminar
--- (09:00 ocupa até 09:30, então 09:15 conflita e 09:30 não).
 CREATE OR REPLACE FUNCTION fn_valida_conflito_agenda()
 RETURNS TRIGGER AS $$
-DECLARE
-    v_inicio TIMESTAMP := NEW.data_hora_marcado;
-    v_fim    TIMESTAMP := NEW.data_hora_marcado + fn_duracao_consulta();
 BEGIN
     -- Ignora consultas canceladas
-    IF NEW.status = 'CANCELADA' OR NEW.data_hora_marcado IS NULL THEN
+    IF NEW.status = 'CANCELADA' THEN
         RETURN NEW;
-    END IF;
-
-    -- Trava o médico e a sala até o fim da transação: duas gravações simultâneas
-    -- no mesmo horário esperam uma pela outra em vez de passarem juntas pela verificação.
-    PERFORM pg_advisory_xact_lock(1, NEW.id_medico);
-    IF NEW.id_sala IS NOT NULL THEN
-        PERFORM pg_advisory_xact_lock(2, NEW.id_sala);
     END IF;
 
     -- Conflito de médico
     IF EXISTS (
         SELECT 1 FROM consulta c
         WHERE c.id_medico = NEW.id_medico
-          AND c.data_hora_marcado < v_fim
-          AND c.data_hora_marcado + fn_duracao_consulta() > v_inicio
-          AND c.status IS DISTINCT FROM 'CANCELADA'
+          AND c.data_hora_marcado = NEW.data_hora_marcado
+          AND c.status <> 'CANCELADA'
           AND c.id_consulta <> COALESCE(NEW.id_consulta, -1)
     ) THEN
-        RAISE EXCEPTION '% já tem consulta marcada nesse horário (%).',
-            (SELECT nome_medico FROM medico WHERE id_medico = NEW.id_medico),
-            to_char(v_inicio, 'DD/MM/YYYY HH24:MI');
+        RAISE EXCEPTION 'O médico % já possui consulta marcada em %.',
+            NEW.id_medico, NEW.data_hora_marcado;
     END IF;
 
     -- Conflito de sala
     IF NEW.id_sala IS NOT NULL AND EXISTS (
         SELECT 1 FROM consulta c
         WHERE c.id_sala = NEW.id_sala
-          AND c.data_hora_marcado < v_fim
-          AND c.data_hora_marcado + fn_duracao_consulta() > v_inicio
-          AND c.status IS DISTINCT FROM 'CANCELADA'
+          AND c.data_hora_marcado = NEW.data_hora_marcado
+          AND c.status <> 'CANCELADA'
           AND c.id_consulta <> COALESCE(NEW.id_consulta, -1)
     ) THEN
-        RAISE EXCEPTION 'A sala % já está ocupada nesse horário (%).',
-            (SELECT descricao FROM sala WHERE id_sala = NEW.id_sala),
-            to_char(v_inicio, 'DD/MM/YYYY HH24:MI');
+        RAISE EXCEPTION 'A sala % já está ocupada em %.',
+            NEW.id_sala, NEW.data_hora_marcado;
     END IF;
 
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_valida_conflito_agenda ON consulta;
+-- Podemos verificar se um médico trabalha no horário da consulta. Caso contrário não será possível agendar.
+-- Os valores de dia_semana devem ser cadastrados no banco em maiúsculas e sem acento!
+
 CREATE TRIGGER trg_valida_conflito_agenda
 BEFORE INSERT OR UPDATE OF data_hora_marcado, id_medico, id_sala, status
 ON consulta
 FOR EACH ROW
 EXECUTE FUNCTION fn_valida_conflito_agenda();
 
-
--- GATILHO 2: a consulta inteira (início + duração) precisa caber em uma faixa
--- de atendimento do médico naquele dia da semana.
--- Os valores de dia_semana devem ser cadastrados no banco em maiúsculas e sem acento!
 CREATE OR REPLACE FUNCTION fn_valida_horario_medico()
 RETURNS TRIGGER AS $$
 DECLARE
     v_dia_semana TEXT;
-    v_dia        DATE;
+    v_hora       TIME;
 BEGIN
     IF NEW.status = 'CANCELADA' THEN
         RETURN NEW;
-    END IF;
-
-    IF NEW.data_hora_marcado IS NULL THEN
-        RAISE EXCEPTION 'Informe a data e a hora da consulta.';
     END IF;
 
     -- Mapeia o número do dia para o texto usado na tabela horario
@@ -100,30 +70,25 @@ BEGIN
         WHEN 5 THEN 'SEXTA'
         WHEN 6 THEN 'SABADO'
     END;
-    v_dia := NEW.data_hora_marcado::DATE;
+    v_hora := NEW.data_hora_marcado::TIME;
 
-    -- compara como data + hora para que uma consulta perto da meia-noite não "volte" para 00:00
     IF NOT EXISTS (
         SELECT 1
         FROM horario_medico hm
         JOIN horario h ON h.id_horario = hm.id_horario
         WHERE hm.id_medico = NEW.id_medico
           AND UPPER(h.dia_semana) = v_dia_semana
-          AND NEW.data_hora_marcado >= v_dia + h.hora_inicio
-          AND NEW.data_hora_marcado + fn_duracao_consulta() <= v_dia + h.hora_fim
+          AND v_hora >= h.hora_inicio
+          AND v_hora <  h.hora_fim
     ) THEN
-        RAISE EXCEPTION '% não atende em % às % (a consulta dura %).',
-            (SELECT nome_medico FROM medico WHERE id_medico = NEW.id_medico),
-            to_char(v_dia, 'DD/MM/YYYY'),
-            to_char(NEW.data_hora_marcado, 'HH24:MI'),
-            to_char(fn_duracao_consulta(), 'FMMI "minutos"');
+        RAISE EXCEPTION 'O médico % não atende em % às %.',
+            NEW.id_medico, v_dia_semana, v_hora;
     END IF;
 
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_valida_horario_medico ON consulta;
 CREATE TRIGGER trg_valida_horario_medico
 BEFORE INSERT OR UPDATE OF data_hora_marcado, id_medico
 ON consulta
