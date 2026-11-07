@@ -3,6 +3,9 @@ from dados.dao import PacienteDAO, MedicoDAO, SalaDAO, UsuarioDAO, PagamentoDAO,
 from .modelos import Paciente, Medico
 from .validacao import ErroNegocio, checa_senha, cpf_valido, dados_da_sessao, parse_data, parse_numero, somente_digitos
 
+DIAS_DA_SEMANA = ("SEGUNDA", "TERCA", "QUARTA", "QUINTA", "SEXTA", "SABADO", "DOMINGO")
+
+
 class PacienteService:
     def __init__(self):
         self.dao = PacienteDAO()
@@ -63,6 +66,22 @@ class MedicoService:
 
     def salas_opcoes(self):
         return self.salas.opcoes()
+
+    def horarios_do_medico(self, id_medico):
+        """Texto com os horários do médico, uma linha por dia: 'SEGUNDA: 08:00-12:00, 14:00-18:00'."""
+        if not id_medico:
+            return "Selecione um médico para ver os horários."
+        # Junta as faixas de cada dia: {"SEGUNDA": ["08:00-12:00", "14:00-18:00"], ...}
+        faixas_por_dia = {}
+        for dia, faixa in self.dao.horarios_do_medico(id_medico):
+            faixas_por_dia.setdefault(dia.upper(), []).append(faixa)
+        if not faixas_por_dia:
+            return "Este médico não tem horários cadastrados."
+        linhas = ["Horários de atendimento:"]
+        for dia in DIAS_DA_SEMANA:  # percorre na ordem da semana
+            if dia in faixas_por_dia:
+                linhas.append(f"{dia}: " + ", ".join(faixas_por_dia[dia]))
+        return "\n".join(linhas)
 
 SITUACOES_CONTA = ("Em aberto", "Parcial", "Quitada")
 

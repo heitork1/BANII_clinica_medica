@@ -15,10 +15,12 @@ class AgendaService:
     def __init__(self):
         self.dao = ConsultaDAO()
 
-    def agendar(self, id_paciente, id_medico, id_sala, data_hora):
+    def agendar(self, id_paciente, id_medico, id_sala, data, hora):
+        """data no formato DD/MM/AAAA e hora no formato HH:MM (campos separados na tela)."""
         if not (id_paciente and id_medico and id_sala):
             raise ErroNegocio("Selecione paciente, médico e sala.")
-        dh = parse_data_hora(data_hora)
+        # Junta os dois textos ("10/11/2026" + "14:30") e converte de uma vez.
+        dh = parse_data_hora(f"{data.strip()} {hora.strip()}")
         # A conta NÃO é criada aqui: ela nasce quando a consulta é finalizada (ContaService).
         return self.dao.inserir(Consulta(id_paciente, id_medico, id_sala, dh))
 

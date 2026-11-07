@@ -91,6 +91,16 @@ class MedicoDAO:
             return _tuplas(cur.fetchall())
 
 
+    def horarios_do_medico(self, id_medico):
+        """Horários em que um médico atende: lista de (dia_semana, 'HH:MM-HH:MM')."""
+        with transacao() as cur:
+            cur.execute(
+                "SELECT h.dia_semana, to_char(h.hora_inicio,'HH24:MI') || '-' || to_char(h.hora_fim,'HH24:MI') "
+                "FROM horario_medico hm JOIN horario h USING (id_horario) "
+                "WHERE hm.id_medico = %s ORDER BY h.hora_inicio", (id_medico,))
+            return _tuplas(cur.fetchall())
+
+
 class SalaDAO:
     def opcoes(self):
         with transacao() as cur:

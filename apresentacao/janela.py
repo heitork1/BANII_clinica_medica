@@ -224,8 +224,14 @@ class AbaConsultas(ttk.Frame):
             c = ttk.Combobox(f, width=45, state="readonly")
             c.grid(row=i, column=1, sticky="w")
             self.cb[nome] = c
-        self.dh = campo(f, "Data e hora* (DD/MM/AAAA HH:MM)", 3, 20)
-        ttk.Button(f, text="Agendar", command=self.ao_clicar_agendar).grid(row=4, column=1, sticky="w", pady=4)
+        self.data = campo(f, "Data* (DD/MM/AAAA)", 3, 12)
+        self.hora = campo(f, "Hora* (HH:MM)", 4, 8)
+        ttk.Button(f, text="Agendar", command=self.ao_clicar_agendar).grid(row=5, column=1, sticky="w", pady=4)
+
+        # À direita do formulário: horários do médico escolhido (atualiza quando troca o médico).
+        self.lbl_horarios = ttk.Label(f, text="Selecione um médico para ver os horários.", justify="left")
+        self.lbl_horarios.grid(row=0, column=2, rowspan=5, sticky="nw", padx=20)
+        self.cb["Médico"].bind("<<ComboboxSelected>>", self.ao_escolher_medico)
 
         b = ttk.Frame(self)
         b.pack(fill="x", padx=6)
@@ -239,6 +245,17 @@ class AbaConsultas(ttk.Frame):
         self.tab.bind("<Button-1>", self.ao_clicar_na_tabela)
         self.tab.bind("<Motion>", self.ao_mover_o_mouse)
         self.atualizar()
+
+    def ao_escolher_medico(self, evento):
+        """Quando o usuário escolhe um médico no combo, mostra os horários de atendimento dele."""
+        id_medico = id_de(self.cb["Médico"].get())
+
+        def buscar_horarios():
+            return self.med.horarios_do_medico(id_medico)
+
+        texto = executar(buscar_horarios)
+        if texto is not None:
+            self.lbl_horarios.config(text=texto)
 
     def consulta_do_botao(self, evento):
         """Se o mouse está sobre o 'botão' Atendimento de uma consulta REALIZADA, devolve o id dela.
@@ -292,7 +309,7 @@ class AbaConsultas(ttk.Frame):
 
         def chamar_servico():
             # AgendaService.agendar valida os dados e grava no banco (ConsultaDAO.inserir)
-            return self.agenda.agendar(id_paciente, id_medico, id_sala, self.dh.get())
+            return self.agenda.agendar(id_paciente, id_medico, id_sala, self.data.get(), self.hora.get())
 
         # executar() roda chamar_servico e mostra caixa de erro se ErroNegocio/ErroBanco
         consulta_id = executar(chamar_servico)
@@ -359,8 +376,9 @@ class JanelaAtendimento(tk.Toplevel):
         for i, (chave, rotulo) in enumerate((("sintomas", "Sintomas"), ("diagnostico", "Diagnóstico"),
                                              ("prescricao", "Prescrição")), start=1):
             ttk.Label(f, text=rotulo).grid(row=i, column=0, sticky="ne", padx=4, pady=2)
-            caixa = tk.Text(f, width=55, height=3)
+            caixa = tk.Text(f, width=55, height=3 )
             caixa.insert("1.0", dados[chave] or "")
+            caixa.config(state="disabled")
             caixa.grid(row=i, column=1, sticky="w", pady=2)
             self.txt[chave] = caixa
 
@@ -368,18 +386,18 @@ class JanelaAtendimento(tk.Toplevel):
         proc = ttk.LabelFrame(f, text="Procedimentos realizados")
         proc.grid(row=4, column=0, columnspan=2, sticky="nsew", pady=(8, 0))
         linha = ttk.Frame(proc)
-        linha.pack(fill="x", padx=6, pady=6)
+        # linha.pack(fill="x", padx=6, pady=6)
         self.cb_proc = ttk.Combobox(linha, width=48, state="readonly")
-        self.cb_proc.pack(side="left")
-        ttk.Label(linha, text="Qtd").pack(side="left", padx=(10, 2))
-        self.qtd = ttk.Spinbox(linha, from_=1, to=999, width=5)
-        self.qtd.set(1)
-        self.qtd.pack(side="left")
-        ttk.Button(linha, text="Adicionar", command=self.adicionar).pack(side="left", padx=6)
+        # self.cb_proc.pack(side="left")
+        # ttk.Label(linha, text="Qtd").pack(side="left", padx=(10, 2))
+        # self.qtd = ttk.Spinbox(linha, from_=1, to=999, width=5)
+        # self.qtd.set(1)
+        # self.qtd.pack(side="left")
+        # ttk.Button(linha, text="Adicionar", command=self.adicionar).pack(side="left", padx=6)
 
         self.tab = tabela(proc, ("Procedimento", "Qtd", "Valor unit.", "Subtotal"), (280, 50, 90, 90))
         self.tab.configure(height=5)
-        ttk.Button(proc, text="Remover selecionado", command=self.remover).pack(anchor="e", padx=6, pady=(0, 6))
+        # ttk.Button(proc, text="Remover selecionado", command=self.remover).pack(anchor="e", padx=6, pady=(0, 6))
 
         self.lbl_total = ttk.Label(f, text="", font=("Helvetica", 11, "bold"))
         self.lbl_total.grid(row=5, column=0, columnspan=2, sticky="e", pady=(8, 0))
@@ -387,7 +405,7 @@ class JanelaAtendimento(tk.Toplevel):
         botoes = ttk.Frame(f)
         botoes.grid(row=6, column=0, columnspan=2, sticky="e", pady=(10, 0))
         ttk.Button(botoes, text="Fechar", command=self.destroy).pack(side="left", padx=4)
-        ttk.Button(botoes, text="Salvar", command=self.salvar).pack(side="left")
+        # ttk.Button(botoes, text="Salvar", command=self.salvar).pack(side="left")
 
         # 4) Carrega o combo de procedimentos e a tabela com o que a consulta já tem.
         lista = executar(ContaService().procedimentos) or []
