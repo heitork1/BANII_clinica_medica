@@ -323,6 +323,69 @@ class PagamentoDAO:
 
 COLUNAS = "id_usuario, nome, email, perfil, ativo, id_medico"
 
+class AtendimentoDAO:
+    def procedimentos(self, id_consulta):
+        with transacao() as cur:
+            cur.execute(
+                """
+                SELECT cp.id_procedimento, p.descricao, cp.quantidade, cp.valor_unitario,
+                       cp.quantidade * cp.valor_unitario AS subtotal
+                  FROM consulta_procedimento cp
+                  JOIN procedimento p ON p.id_procedimento = cp.id_procedimento
+                 WHERE cp.id_consulta = %s
+                 ORDER BY p.descricao
+                """,
+                (id_consulta,),
+            )
+            return cur.fetchall()
+
+    def buscar(self, id_consulta):
+        """Dados da consulta que a janela de atendimento mostra (devolve None se não existir)."""
+        with transacao() as cur:
+            cur.execute(
+                "SELECT c.id_consulta, c.status, c.sintomas, c.diagnostico, c.prescricao, "
+                "to_char(c.data_hora_marcado,'DD/MM/YYYY HH24:MI') AS data_hora, "
+                "p.nome AS paciente, m.nome_medico AS medico "
+                "FROM consulta c JOIN paciente p USING (id_paciente) JOIN medico m USING (id_medico) "
+                "WHERE c.id_consulta = %s", (id_consulta,))
+            return cur.fetchone()
+
+    def salvar(self, id_consulta, sintomas, diagnostico, prescricao, itens):
+        """Salva o prontuário e a lista de procedimentos de uma consulta REALIZADA, numa transação só.
+        itens: lista de (id_procedimento, quantidade, valor_unitario).
+        O gatilho fn_atualiza_valor_procedimento_conta recalcula conta.valor_procedimento sozinho."""
+        with transacao() as cur:
+            cur.execute("SELECT status, id_conta FROM consulta WHERE id_consulta = %s FOR UPDATE",
+                        (id_consulta,))
+            consulta = cur.fetchone()
+            if consulta is None:
+                raise ErroBanco("Consulta não encontrada.")
+            if consulta["status"] != "REALIZADA":
+                raise ErroBanco("Só dá para editar o atendimento de uma consulta realizada.")
+
+            # 1) prontuário
+            cur.execute("UPDATE consulta SET sintomas = %s, diagnostico = %s, prescricao = %s "
+                        "WHERE id_consulta = %s", (sintomas, diagnostico, prescricao, id_consulta))
+
+            # 2) procedimentos: apaga a lista antiga e grava a nova (é o jeito mais simples de editar)
+            cur.execute("DELETE FROM consulta_procedimento WHERE id_consulta = %s", (id_consulta,))
+            for id_procedimento, quantidade, valor_unitario in itens:
+                cur.execute(
+                    "INSERT INTO consulta_procedimento (id_consulta, id_procedimento, quantidade, valor_unitario) "
+                    "VALUES (%s, %s, %s, %s)", (id_consulta, id_procedimento, quantidade, valor_unitario))
+
+            # 3) o total novo da conta não pode ficar menor do que já foi pago.
+            #    Se ficar, o erro desfaz tudo (prontuário e procedimentos).
+            cur.execute(
+                f"SELECT COALESCE(ct.valor_total, 0) AS total, {SOMA_PAGA} AS pago "
+                "FROM conta ct LEFT JOIN pagamento pg ON pg.id_conta = ct.id_conta "
+                "WHERE ct.id_conta = %s GROUP BY ct.id_conta", (consulta["id_conta"],))
+            conta = cur.fetchone()
+            if conta and conta["pago"] > conta["total"]:
+                raise ErroBanco(f"Com essa lista de procedimentos o total da conta seria R$ {conta['total']:.2f}, "
+                                f"menos do que já foi pago (R$ {conta['pago']:.2f}). Nada foi alterado.")
+
+    
 
 class UsuarioDAO:
     def listar(self):

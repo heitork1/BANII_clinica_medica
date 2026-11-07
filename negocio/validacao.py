@@ -4,13 +4,6 @@ from datetime import datetime
 
 from negocio import ErroNegocio
 
-EMAIL_VALIDO = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
-TAMANHO_MINIMO_SENHA = 3
-
-PERFIS = {
-    "ADMIN": "Administrador",
-    "MEDICO": "Médico",
-}
 
 def somente_digitos(texto):
     return re.sub(r"\D", "", texto or "")
@@ -56,10 +49,3 @@ def dados_da_sessao(usuario):
         "perfil": usuario["perfil"],
         "id_medico": usuario["id_medico"],
     }
-
-def validar_nova_senha(senha, confirmacao, erros, campo="senha", campo_confirmacao="confirmacao_senha"):
-    """Confere tamanho e confirmação; os problemas vão para o dicionário `erros`."""
-    if len(senha or "") < TAMANHO_MINIMO_SENHA:
-        erros[campo] = f"A senha precisa ter pelo menos {TAMANHO_MINIMO_SENHA} caracteres."
-    elif senha != confirmacao:
-        erros[campo_confirmacao] = "As senhas não conferem."
