@@ -1,7 +1,5 @@
 --dados para testar o login
 
-INSERT INTO medico (nome_medico, percentual_honorario, crm)
-VALUES ('MédicoA', 25, '12345678');
 
 INSERT INTO usuario values ('1','admin', 'admin@admin.com', '123456', 'ADMIN', 'TRUE')
 

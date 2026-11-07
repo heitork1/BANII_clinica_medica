@@ -21,6 +21,11 @@ class PacienteDAO:
             for tel in p.telefones:
                 cur.execute("INSERT INTO telefone_paciente (numero_telefone, id_paciente) VALUES (%s,%s)",
                             (tel, id_paciente))
+            if p.id_convenio:  # mesma transação: se a carteirinha falhar, o paciente também não é gravado
+                cur.execute(
+                    "INSERT INTO plano_convenio (id_paciente, id_convenio, numero_carteirinha, validade, tipo_plano) "
+                    "VALUES (%s,%s,%s,%s,%s)",
+                    (id_paciente, p.id_convenio, p.carteirinha, p.validade, p.tipo_plano or None))
             return id_paciente
 
     def listar(self, filtro=""):
@@ -28,9 +33,18 @@ class PacienteDAO:
             cur.execute(
                 'SELECT p.id_paciente, p.nome, p.cpf, p.data_nasc, p."e-mail", '
                 "COALESCE((SELECT string_agg(t.numero_telefone, ', ') FROM telefone_paciente t "
-                "WHERE t.id_paciente = p.id_paciente), '') AS telefones "
+                "WHERE t.id_paciente = p.id_paciente), '') AS telefones, "
+                "COALESCE((SELECT string_agg(cv.nome || CASE WHEN pc.validade IS NOT NULL "
+                "THEN ' (val. ' || to_char(pc.validade, 'DD/MM/YYYY') || ')' ELSE '' END, ', ') "
+                "FROM plano_convenio pc JOIN convenio cv ON cv.id_convenio = pc.id_convenio "
+                "WHERE pc.id_paciente = p.id_paciente), '') AS convenio "
                 "FROM paciente p WHERE p.nome ILIKE %s OR p.cpf LIKE %s ORDER BY p.nome",
                 (f"%{filtro}%", f"%{filtro}%"))
+            return _tuplas(cur.fetchall())
+
+    def convenios(self):
+        with transacao() as cur:
+            cur.execute("SELECT id_convenio, nome FROM convenio ORDER BY nome")
             return _tuplas(cur.fetchall())
 
     def existe_cpf(self, cpf):

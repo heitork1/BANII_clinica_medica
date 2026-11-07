@@ -14,6 +14,11 @@ class Paciente:
     endereco: str = ""
     email: str = ""
     telefones: List[str] = field(default_factory=list)
+    # Carteirinha de convênio (opcional): vira uma linha em plano_convenio
+    id_convenio: Optional[int] = None
+    carteirinha: str = ""
+    validade: Optional[date] = None
+    tipo_plano: str = ""
 
 
 @dataclass

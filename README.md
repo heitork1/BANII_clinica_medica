@@ -8,7 +8,7 @@ Aplicação em Python (POO) com três camadas:
 | Negócio | `negocio/` | Modelos, validações (CPF, datas, valores) e serviços; `agenda.py` define `DURACAO_CONSULTA` |
 | Dados | `dados/` | Conexão/transação e DAOs com SQL (psycopg2) |
 
-Funcionalidades: consultar pagamentos (aba Pagamentos, com filtros por período, forma, convênio, paciente e médico), cadastrar/buscar pacientes (com telefones), cadastrar/listar médicos (especialidades e horários),
+Funcionalidades: consultar pagamentos (aba Pagamentos, com filtros por período, forma, convênio, paciente e médico), cadastrar/buscar pacientes (com telefones e, opcionalmente, a carteirinha do convênio), cadastrar/listar médicos (especialidades e horários),
 agendar consultas e alterar o status. Ao marcar uma consulta como REALIZADA abre-se a janela de finalização (valor da consulta e procedimentos realizados) e a conta da consulta é gerada; as contas ficam na aba Contas e são quitadas na aba Pagamentos. Conflitos de agenda e horário do médico são
 barrados pelos gatilhos do banco e a mensagem aparece na tela.
 

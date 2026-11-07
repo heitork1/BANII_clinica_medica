@@ -58,53 +58,23 @@ def id_de(texto):
 
 
 class AbaInicio(ttk.Frame):
+    """Tela inicial: saudação, data de hoje e boas-vindas."""
+
     def __init__(self, pai):
-            super().__init__(pai)
-            self.pai = pai
+        super().__init__(pai)
+        hoje = datetime.now()
+        saudacao = "Bom dia!" if hoje.hour < 12 else ("Boa tarde!" if hoje.hour < 18 else "Boa noite!")
+        centro = ttk.Frame(self)
+        centro.pack(expand=True)  # sem fill: o bloco fica centralizado na aba
+        ttk.Label(centro, text=saudacao, font=("Helvetica", 22, "bold")).pack()
+        ttk.Label(centro, text=f"{hoje.day}/{hoje.month}/{hoje.year}", font=("Helvetica", 11),
+                  foreground="#666666").pack(pady=(2, 16))
+        ttk.Label(centro, text="Bem-vindo(a) à Clínica CCT", font=("Helvetica", 14)).pack()
 
-            hoje = datetime.now()
-            dia_extenso = f"{hoje.day}/{hoje.month}/{hoje.year}"
-
-            saudacao = "Bom dia!" if hoje.hour < 12 else ("Boa tarde!" if hoje.hour < 18 else "Boa noite!")
-            topo = ttk.Frame(self)
-            topo.pack(fill="x", padx=16, pady=(16,12))
-
-            lbl_saudacao = ttk.Frame(topo)
-            lbl_saudacao.pack(side="left")
-            ttk.Label(lbl_saudacao, text=saudacao, font=("Helvetica", 15, "bold")).pack(anchor="w")
-            ttk.Label(lbl_saudacao, text=dia_extenso, font=("Helvetica", 10), foreground="#666666").pack(anchor="w", pady=(2,0))
-
-            botoes_topo = ttk.Frame(topo)
-            botoes_topo.pack(side="right")
-
-            ttk.Button(botoes_topo, text="+ Novo paciente", command=lambda: self.pai.select(2)).pack(side="left", padx=4)
-            ttk.Button(botoes_topo, text="+ Nova consulta", command=lambda: self.pai.select(1)).pack(side="left", padx=4)
-
-            ttk.Separator(self, orient="horizontal").pack(fill="x", padx=16, pady=8) 
-
-            card = ttk.LabelFrame(self, text="Consultas de hoje ", padding=14)
-            card.pack(fill="x", padx=16, pady=10)
-
-            card_topo = ttk.Frame(card)
-            card_topo.pack(fill="x", pady=(0,10))
-
-            ttk.Label(card_topo, text="Resumo do dia", font=("Helvetica", 10, "bold")).pack(side="left")
-            ttk.Button(card_topo, text="Abrir agenda →", command=lambda: self.pai.select(1)).pack(side="right")
-
-            corpo_vazio = ttk.Frame(card)
-            corpo_vazio.pack(fill="both", expand=True, pady=25)
-
-            ttk.Label(
-                corpo_vazio,
-                text="Nenhuma consulta marcada para hoje",
-                font=("Helvetica", 10, "italic"),
-                foreground="#555555"
-            ).pack(pady=(0,10))
-
-            ttk.Button(corpo_vazio, text="Marcar consulta", command=lambda: self.pai.select(1)).pack()
-                
 
 class AbaPacientes(ttk.Frame):
+    NENHUM = "Nenhum"
+
     def __init__(self, pai):
         super().__init__(pai)
         self.svc = PacienteService()
@@ -122,27 +92,63 @@ class AbaPacientes(ttk.Frame):
         self.tels = campo(f, "Telefones (separe por vírgula)", 7, 35)
         ttk.Button(f, text="Cadastrar", command=self.cadastrar).grid(row=8, column=1, sticky="w", pady=4)
 
+        # Carteirinha do convênio (opcional): grava uma linha em plano_convenio junto com o paciente
+        cv = ttk.LabelFrame(f, text="Convênio (opcional)")
+        cv.grid(row=0, column=2, rowspan=5, sticky="n", padx=16)
+        ttk.Label(cv, text="Convênio").grid(row=0, column=0, sticky="e", padx=4, pady=2)
+        self.cb_conv = ttk.Combobox(cv, width=22, state="readonly")
+        self.cb_conv.grid(row=0, column=1, sticky="w", pady=2)
+        self.cb_conv.bind("<<ComboboxSelected>>", lambda e: self.ajustar_convenio())
+        self.carteirinha = campo(cv, "Nº da carteirinha*", 1, 25)
+        self.validade = campo(cv, "Validade (DD/MM/AAAA)", 2, 15)
+        self.plano = campo(cv, "Tipo de plano", 3, 25)
+        self.carregar_convenios()
+
         b = ttk.Frame(self)
         b.pack(fill="x", padx=6)
         ttk.Label(b, text="Buscar (nome ou CPF):").pack(side="left")
         self.busca = ttk.Entry(b, width=25)
         self.busca.pack(side="left", padx=4)
         ttk.Button(b, text="Buscar", command=self.atualizar).pack(side="left")
-        self.tab = tabela(self, ("ID", "Nome", "CPF", "Nascimento", "E-mail", "Telefones"),
-                          (40, 200, 110, 90, 180, 150))
+        self.tab = tabela(self, ("ID", "Nome", "CPF", "Nascimento", "E-mail", "Telefones", "Convênio"),
+                          (40, 170, 110, 85, 150, 120, 170))
         self.atualizar()
+
+    def carregar_convenios(self):
+        """Lê os convênios do banco (cadastrados direto nele) e mantém a escolha atual, se ainda existir."""
+        convenios = executar(self.svc.convenios) or []
+        atual = self.cb_conv.get()
+        self.cb_conv["values"] = [self.NENHUM] + [f"{i} - {n}" for i, n in convenios]
+        self.cb_conv.set(atual if atual in self.cb_conv["values"] else self.NENHUM)
+        self.ajustar_convenio()
+
+    def ajustar_convenio(self):
+        """Sem convênio escolhido: limpa e bloqueia os campos da carteirinha."""
+        tem = self.cb_conv.get() != self.NENHUM
+        for e in (self.carteirinha, self.validade, self.plano):
+            e.config(state="normal")
+            if not tem:
+                e.delete(0, "end")
+                e.config(state="disabled")
+
+    def ao_exibir(self):
+        self.carregar_convenios()
 
     def cadastrar(self):
         def chamar_servico():
             # PacienteService.cadastrar valida os dados e grava no banco
             return self.svc.cadastrar(
                 self.nome.get(), self.cpf.get(), self.nasc.get(), self.rg.get(), self.sexo.get(),
-                self.end.get(), self.email.get(), self.tels.get())
+                self.end.get(), self.email.get(), self.tels.get(),
+                None if self.cb_conv.get() == self.NENHUM else id_de(self.cb_conv.get()),
+                self.carteirinha.get(), self.validade.get(), self.plano.get())
 
         paciente_id = executar(chamar_servico)
         if paciente_id:
             for e in (self.nome, self.cpf, self.nasc, self.rg, self.end, self.email, self.tels):
                 e.delete(0, "end")
+            self.cb_conv.set(self.NENHUM)
+            self.ajustar_convenio()  # limpa e bloqueia a carteirinha
             messagebox.showinfo("Pronto", "Paciente cadastrado.")
             self.atualizar()
 

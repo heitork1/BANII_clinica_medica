@@ -1,4 +1,6 @@
 """Camada de negócio: serviços de pacientes e médicos."""
+from datetime import date
+
 from dados.dao import PacienteDAO, MedicoDAO, SalaDAO, UsuarioDAO, PagamentoDAO, ContaDAO, AtendimentoDAO
 from .modelos import Paciente, Medico
 from .validacao import ErroNegocio, checa_senha, cpf_valido, dados_da_sessao, parse_data, parse_numero, somente_digitos
@@ -10,7 +12,8 @@ class PacienteService:
     def __init__(self):
         self.dao = PacienteDAO()
 
-    def cadastrar(self, nome, cpf, data_nasc, rg, sexo, endereco, email, telefones):
+    def cadastrar(self, nome, cpf, data_nasc, rg, sexo, endereco, email, telefones,
+                  id_convenio=None, carteirinha="", validade="", tipo_plano=""):
         nome = nome.strip()
         if not nome:
             raise ErroNegocio("Informe o nome do paciente.")
@@ -24,8 +27,26 @@ class PacienteService:
         tels = [t.strip() for t in telefones.split(",") if t.strip()]
         if self.dao.existe_cpf(cpf_fmt):
             raise ErroNegocio("Já existe um paciente com esse CPF.")
+
+        carteirinha, tipo_plano = carteirinha.strip(), tipo_plano.strip()
+        val = parse_data(validade) if validade.strip() else None
+        if not id_convenio:
+            if carteirinha or val or tipo_plano:
+                raise ErroNegocio("Escolha o convênio ou deixe os dados da carteirinha em branco.")
+        else:
+            if not carteirinha:
+                raise ErroNegocio("Informe o número da carteirinha do convênio.")
+            if len(carteirinha) > 50 or len(tipo_plano) > 50:
+                raise ErroNegocio("Número da carteirinha e tipo de plano aceitam até 50 caracteres.")
+            # O gatilho de pagamento só aceita carteirinha sem validade ou com validade ainda em dia.
+            if val and val < date.today():
+                raise ErroNegocio("A carteirinha está vencida. Informe uma validade futura ou deixe em branco.")
         return self.dao.inserir(Paciente(nome, cpf_fmt, nasc, rg.strip(), sexo, endereco.strip(),
-                                         email.strip(), tels))
+                                         email.strip(), tels, id_convenio or None, carteirinha, val, tipo_plano))
+
+    def convenios(self):
+        """Convênios cadastrados no banco: [(id_convenio, nome)]."""
+        return self.dao.convenios()
 
     def listar(self, filtro=""):
         return self.dao.listar(filtro.strip())
