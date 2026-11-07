@@ -1,6 +1,6 @@
 # Sistema da Clínica: perguntas e desafios
 
-Guia de estudo para a apresentação: perguntas que o professor pode fazer e pequenas alterações que ele pode pedir na hora. Tente responder as perguntas antes de olhar o gabarito, que está no final do arquivo.
+Guia de estudo para a apresentação: perguntas que o professor pode fazer e pequenas alterações que ele pode pedir na hora. Tente responder e resolver antes de olhar o gabarito, que está no final do arquivo.
 
 ## Visão geral
 
@@ -63,155 +63,28 @@ As respostas, com o mesmo código de cada pergunta (A1, B3, C7...), estão na se
 - **C8.** O que é o `id_de` e por que os combos mostram "12 - Maria"?
 - **C9.** O que faz `to_char(c.data_hora_marcado, 'HH24:MI')` nas consultas SQL?
 
-## Desafios de alteração rápida em Python
+## Desafios de alteração rápida
 
-Cada desafio diz o pedido, onde mexer e como fazer. O caminho é sempre o mesmo: ache a camada certa (tela, negócio ou dados) e altere só ela.
+Cada desafio é um pedido que o professor pode fazer na hora. O caminho é sempre o mesmo: descubra a camada certa (tela, negócio, dados ou banco) e altere só ela. A solução de cada um, com o arquivo onde mexer e o código, está na seção "Soluções dos desafios", no final do arquivo.
 
-**Desafio 1: mostrar quantas consultas há hoje na tela inicial**
+### Em Python
 
-Onde: `AbaInicio`, em janela.py.
+- **DP1.** Mostrar quantas consultas há hoje na tela inicial.
+- **DP2.** Esconder as consultas canceladas da tela inicial.
+- **DP3.** Não deixar agendar consulta no passado.
+- **DP4.** Preencher a data de hoje no campo Data do agendamento.
+- **DP5.** Limpar o formulário depois de agendar.
+- **DP6.** Aceitar no máximo 99 unidades de cada procedimento.
+- **DP7.** Listar as consultas das mais antigas para as mais novas.
+- **DP8.** Deixar o prontuário somente leitura na janela de atendimento.
 
-```python
-# no __init__, logo depois do self.lbl_vazio
-self.lbl_quantidade = ttk.Label(card, text="")
-self.lbl_quantidade.pack(anchor="e")
+### No banco
 
-# em atualizar, logo depois de preencher(self.tab, consultas)
-self.lbl_quantidade.config(text=f"{len(consultas)} consulta(s) hoje")
-```
-
-**Desafio 2: esconder as consultas canceladas da tela inicial**
-
-Onde: `ConsultaDAO.listar_de_hoje`, em dao.py. Troque a última linha do começo da consulta SQL:
-
-```python
-"WHERE c.data_hora_marcado::date = CURRENT_DATE "
-"AND c.status <> 'CANCELADA' ")
-```
-
-**Desafio 3: não deixar agendar consulta no passado**
-
-Onde: `AgendaService.agendar`, em agenda.py. A regra é de negócio, então fica no serviço.
-
-```python
-from datetime import datetime, timedelta   # no topo: acrescente o datetime
-
-# em agendar, logo depois de calcular dh
-if dh < datetime.now():
-    raise ErroNegocio("Não é possível agendar uma consulta no passado.")
-```
-
-**Desafio 4: preencher a data de hoje no campo Data do agendamento**
-
-Onde: `AbaConsultas.__init__`, em janela.py, logo depois de criar `self.data`.
-
-```python
-self.data.insert(0, datetime.now().strftime("%d/%m/%Y"))
-```
-
-**Desafio 5: limpar o formulário depois de agendar**
-
-Onde: `AbaConsultas.ao_clicar_agendar`, dentro do `if consulta_id:`.
-
-```python
-self.data.delete(0, "end")
-self.hora.delete(0, "end")
-for combo in self.cb.values():
-    combo.set("")
-```
-
-**Desafio 6: aceitar no máximo 99 unidades de cada procedimento**
-
-Onde: a validação de quantidade, em servicos.py, nos dois lugares que ela existe: `ContaService.finalizar_consulta` e `AtendimentoService.salvar`.
-
-```python
-if quantidade < 1 or quantidade > 99:
-    raise ErroNegocio("A quantidade de cada procedimento deve ficar entre 1 e 99.")
-```
-
-No `finalizar_consulta` a variável se chama `qtd`, então use esse nome lá.
-
-**Desafio 7: listar as consultas das mais antigas para as mais novas**
-
-Onde: `ConsultaDAO.listar`, em dao.py. Troque o final da consulta SQL:
-
-```python
-"ORDER BY c.data_hora_marcado"      # antes: ... DESC
-```
-
-**Desafio 8: deixar o prontuário somente leitura na janela de atendimento**
-
-Onde: `JanelaAtendimento.__init__`, no laço que cria as três caixas de texto. O `config` vem depois do `insert`, porque uma caixa desabilitada ignora o `insert`.
-
-```python
-caixa.insert("1.0", dados[chave] or "")
-caixa.config(state="disabled")
-```
-
-## Desafios de alteração rápida no banco
-
-Os gatilhos ficam em 02_funcoes_gatilhos.sql, que pode ser executado de novo: as funções são substituídas e os gatilhos recriados.
-
-**Desafio 1: aceitar a forma de pagamento BOLETO**
-
-São duas mudanças, uma no Python e outra no banco, porque a coluna tem uma restrição `CHECK`. Em servicos.py:
-
-```python
-FORMAS_PAGAMENTO = ("CARTAO", "PIX", "DINHEIRO", "BOLETO")
-```
-
-No banco (a coluna `VARCHAR(10)` comporta a palavra):
-
-```sql
-ALTER TABLE pagamento DROP CONSTRAINT pagamento_forma_pagamento_check;
-ALTER TABLE pagamento ADD CONSTRAINT pagamento_forma_pagamento_check
-    CHECK (forma_pagamento IN ('CARTAO', 'PIX', 'DINHEIRO', 'BOLETO'));
-```
-
-Se o nome da restrição der erro, veja o nome real com `\d pagamento` no psql. A nova forma aparece sozinha no combo do pagamento e no filtro da aba Pagamentos, porque os dois usam `FORMAS_PAGAMENTO`.
-
-**Desafio 2: não aceitar pagamento com data futura**
-
-Onde: função `fn_valida_pagamento`, em 02_funcoes_gatilhos.sql, logo depois da verificação de `NEW.id_conta IS NULL`. A variável `v_data` já existe.
-
-```sql
-IF v_data > CURRENT_DATE THEN
-    RAISE EXCEPTION 'A data do pagamento não pode ser futura.';
-END IF;
-```
-
-Depois, execute o arquivo de novo. A mensagem aparece na caixa de erro do sistema.
-
-**Desafio 3: cadastrar um novo horário de atendimento para um médico**
-
-O dia da semana tem que estar em maiúsculas e sem acento, por causa do gatilho de horário. Troque o `1` pelo id do médico.
-
-```sql
-WITH novo AS (
-    INSERT INTO horario (hora_inicio, hora_fim, dia_semana)
-    VALUES ('08:00', '12:00', 'SABADO')
-    RETURNING id_horario
-)
-INSERT INTO horario_medico (id_medico, id_horario)
-SELECT 1, id_horario FROM novo;
-```
-
-**Desafio 4: mostrar o total pago por forma de pagamento**
-
-```sql
-SELECT forma_pagamento, SUM(valor_pago) AS total
-FROM pagamento
-GROUP BY forma_pagamento
-ORDER BY total DESC;
-```
-
-**Desafio 5: desligar o gatilho de conflito de agenda**
-
-```sql
-DROP TRIGGER IF EXISTS trg_valida_conflito_agenda ON consulta;
-```
-
-O `ON consulta` é obrigatório no PostgreSQL. Isso desliga a verificação de médico e a de sala, porque as duas estão na mesma função. Para voltar, execute o arquivo 02_funcoes_gatilhos.sql de novo.
+- **DB1.** Aceitar a forma de pagamento BOLETO.
+- **DB2.** Não aceitar pagamento com data futura.
+- **DB3.** Cadastrar um novo horário de atendimento para um médico.
+- **DB4.** Mostrar o total pago por forma de pagamento.
+- **DB5.** Desligar o gatilho de conflito de agenda.
 
 ## Respostas das perguntas
 
@@ -331,3 +204,153 @@ O combo mostra um texto legível com o id na frente. A função `id_de` separa o
 **C9. O que faz `to_char(c.data_hora_marcado, 'HH24:MI')` nas consultas SQL?**
 
 Converte a data e hora em texto no formato escolhido. `HH24` é a hora de 00 a 23 e `MI` são os minutos, então `2026-11-10 14:30:00` vira `14:30`. Cuidado: `MM` é o mês, não os minutos.
+
+## Soluções dos desafios
+
+### Em Python
+
+**DP1. Mostrar quantas consultas há hoje na tela inicial**
+
+Onde: `AbaInicio`, em janela.py.
+
+```python
+# no __init__, logo depois do self.lbl_vazio
+self.lbl_quantidade = ttk.Label(card, text="")
+self.lbl_quantidade.pack(anchor="e")
+
+# em atualizar, logo depois de preencher(self.tab, consultas)
+self.lbl_quantidade.config(text=f"{len(consultas)} consulta(s) hoje")
+```
+
+**DP2. Esconder as consultas canceladas da tela inicial**
+
+Onde: `ConsultaDAO.listar_de_hoje`, em dao.py. Troque a última linha do começo da consulta SQL:
+
+```python
+"WHERE c.data_hora_marcado::date = CURRENT_DATE "
+"AND c.status <> 'CANCELADA' ")
+```
+
+**DP3. Não deixar agendar consulta no passado**
+
+Onde: `AgendaService.agendar`, em agenda.py. A regra é de negócio, então fica no serviço.
+
+```python
+from datetime import datetime, timedelta   # no topo: acrescente o datetime
+
+# em agendar, logo depois de calcular dh
+if dh < datetime.now():
+    raise ErroNegocio("Não é possível agendar uma consulta no passado.")
+```
+
+**DP4. Preencher a data de hoje no campo Data do agendamento**
+
+Onde: `AbaConsultas.__init__`, em janela.py, logo depois de criar `self.data`.
+
+```python
+self.data.insert(0, datetime.now().strftime("%d/%m/%Y"))
+```
+
+**DP5. Limpar o formulário depois de agendar**
+
+Onde: `AbaConsultas.ao_clicar_agendar`, dentro do `if consulta_id:`.
+
+```python
+self.data.delete(0, "end")
+self.hora.delete(0, "end")
+for combo in self.cb.values():
+    combo.set("")
+```
+
+**DP6. Aceitar no máximo 99 unidades de cada procedimento**
+
+Onde: a validação de quantidade, em servicos.py, nos dois lugares que ela existe: `ContaService.finalizar_consulta` e `AtendimentoService.salvar`.
+
+```python
+if quantidade < 1 or quantidade > 99:
+    raise ErroNegocio("A quantidade de cada procedimento deve ficar entre 1 e 99.")
+```
+
+No `finalizar_consulta` a variável se chama `qtd`, então use esse nome lá.
+
+**DP7. Listar as consultas das mais antigas para as mais novas**
+
+Onde: `ConsultaDAO.listar`, em dao.py. Troque o final da consulta SQL:
+
+```python
+"ORDER BY c.data_hora_marcado"      # antes: ... DESC
+```
+
+**DP8. Deixar o prontuário somente leitura na janela de atendimento**
+
+Onde: `JanelaAtendimento.__init__`, no laço que cria as três caixas de texto. O `config` vem depois do `insert`, porque uma caixa desabilitada ignora o `insert`.
+
+```python
+caixa.insert("1.0", dados[chave] or "")
+caixa.config(state="disabled")
+```
+
+### No banco
+
+Os gatilhos ficam em 02_funcoes_gatilhos.sql, que pode ser executado de novo: as funções são substituídas e os gatilhos recriados.
+
+**DB1. Aceitar a forma de pagamento BOLETO**
+
+São duas mudanças, uma no Python e outra no banco, porque a coluna tem uma restrição `CHECK`. Em servicos.py:
+
+```python
+FORMAS_PAGAMENTO = ("CARTAO", "PIX", "DINHEIRO", "BOLETO")
+```
+
+No banco (a coluna `VARCHAR(10)` comporta a palavra):
+
+```sql
+ALTER TABLE pagamento DROP CONSTRAINT pagamento_forma_pagamento_check;
+ALTER TABLE pagamento ADD CONSTRAINT pagamento_forma_pagamento_check
+    CHECK (forma_pagamento IN ('CARTAO', 'PIX', 'DINHEIRO', 'BOLETO'));
+```
+
+Se o nome da restrição der erro, veja o nome real com `\d pagamento` no psql. A nova forma aparece sozinha no combo do pagamento e no filtro da aba Pagamentos, porque os dois usam `FORMAS_PAGAMENTO`.
+
+**DB2. Não aceitar pagamento com data futura**
+
+Onde: função `fn_valida_pagamento`, em 02_funcoes_gatilhos.sql, logo depois da verificação de `NEW.id_conta IS NULL`. A variável `v_data` já existe.
+
+```sql
+IF v_data > CURRENT_DATE THEN
+    RAISE EXCEPTION 'A data do pagamento não pode ser futura.';
+END IF;
+```
+
+Depois, execute o arquivo de novo. A mensagem aparece na caixa de erro do sistema.
+
+**DB3. Cadastrar um novo horário de atendimento para um médico**
+
+O dia da semana tem que estar em maiúsculas e sem acento, por causa do gatilho de horário. Troque o `1` pelo id do médico.
+
+```sql
+WITH novo AS (
+    INSERT INTO horario (hora_inicio, hora_fim, dia_semana)
+    VALUES ('08:00', '12:00', 'SABADO')
+    RETURNING id_horario
+)
+INSERT INTO horario_medico (id_medico, id_horario)
+SELECT 1, id_horario FROM novo;
+```
+
+**DB4. Mostrar o total pago por forma de pagamento**
+
+```sql
+SELECT forma_pagamento, SUM(valor_pago) AS total
+FROM pagamento
+GROUP BY forma_pagamento
+ORDER BY total DESC;
+```
+
+**DB5. Desligar o gatilho de conflito de agenda**
+
+```sql
+DROP TRIGGER IF EXISTS trg_valida_conflito_agenda ON consulta;
+```
+
+O `ON consulta` é obrigatório no PostgreSQL. Isso desliga a verificação de médico e a de sala, porque as duas estão na mesma função. Para voltar, execute o arquivo 02_funcoes_gatilhos.sql de novo.
