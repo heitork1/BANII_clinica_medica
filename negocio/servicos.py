@@ -1,7 +1,7 @@
 from datetime import date
 
 from dados.dao import PacienteDAO, MedicoDAO, SalaDAO, UsuarioDAO, PagamentoDAO, ContaDAO, AtendimentoDAO
-from .modelos import Paciente, Medico
+from .modelos import Paciente, Medico, Pagamento, Conta, Atendimento
 from .validacao import ErroNegocio, checa_senha, cpf_valido, dados_da_sessao, parse_data, parse_numero, somente_digitos
 
 DIAS_DA_SEMANA = ("SEGUNDA", "TERCA", "QUARTA", "QUINTA", "SEXTA", "SABADO", "DOMINGO")
@@ -118,8 +118,8 @@ class ContaService:
         for _, qtd in itens:
             if qtd < 1:
                 raise ErroNegocio("A quantidade de cada procedimento deve ser pelo menos 1.")
-        return self.dao.finalizar_consulta(id_consulta, valor, sintomas.strip() or None,
-                                           diagnostico.strip() or None, prescricao.strip() or None, itens)
+        return self.dao.finalizar_consulta(Conta(id_consulta, valor, sintomas.strip() or None,
+                                                 diagnostico.strip() or None, prescricao.strip() or None, itens))
 
     def listar(self, situacao=""):
         if situacao and situacao not in SITUACOES_CONTA:
@@ -146,8 +146,8 @@ class AtendimentoService:
         for _, quantidade, _ in itens:
             if quantidade < 1:
                 raise ErroNegocio("A quantidade de cada procedimento deve ser pelo menos 1.")
-        self.dao.salvar(id_consulta, sintomas.strip() or None, diagnostico.strip() or None,
-                        prescricao.strip() or None, itens)
+        self.dao.salvar(Atendimento(id_consulta, sintomas.strip() or None, diagnostico.strip() or None,
+                                    prescricao.strip() or None, itens))
 
 
 FORMAS_PAGAMENTO = ("CARTAO", "PIX", "DINHEIRO")
@@ -189,14 +189,7 @@ class PagamentoService:
         convenio = 0
         if possui_convenio and valor_convenio.strip():
             convenio = parse_numero(valor_convenio, "Valor do convênio")
-        return self.dao.inserir({
-            "data_pagamento": data_pagamento,
-            "valor_pago": pago,
-            "forma_pagamento": forma,
-            "possui_convenio": possui_convenio,
-            "valor_convenio": convenio,
-            "id_conta": id_conta,
-        })
+        return self.dao.inserir(Pagamento(id_conta, data_pagamento, forma, pago, possui_convenio, convenio))
 
 
 class ServicoAutenticacao:

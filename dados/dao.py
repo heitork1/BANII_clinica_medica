@@ -154,7 +154,8 @@ class ContaDAO:
             cur.execute("SELECT id_procedimento, descricao, valor FROM procedimento ORDER BY descricao")
             return cur.fetchall()
 
-    def finalizar_consulta(self, id_consulta, valor_consulta, sintomas, diagnostico, prescricao, itens):
+    def finalizar_consulta(self, c):
+        id_consulta = c.id_consulta
         with transacao() as cur:
             cur.execute("SELECT status, id_conta FROM consulta WHERE id_consulta = %s FOR UPDATE",
                         (id_consulta,))
@@ -167,19 +168,19 @@ class ContaDAO:
             id_conta = consulta["id_conta"]
             if id_conta is None:
                 cur.execute("INSERT INTO conta (valor_procedimento, valor_consulta) VALUES (0, %s) "
-                            "RETURNING id_conta AS id", (valor_consulta,))
+                            "RETURNING id_conta AS id", (c.valor_consulta,))
                 id_conta = cur.fetchone()["id"]
             else:
                 cur.execute("UPDATE conta SET valor_consulta = %s WHERE id_conta = %s",
-                            (valor_consulta, id_conta))
+                            (c.valor_consulta, id_conta))
 
             cur.execute(
                 "UPDATE consulta SET status = 'REALIZADA', data_hora_realizado = now(), "
                 "sintomas = %s, diagnostico = %s, prescricao = %s, id_conta = %s "
                 "WHERE id_consulta = %s",
-                (sintomas, diagnostico, prescricao, id_conta, id_consulta))
+                (c.sintomas, c.diagnostico, c.prescricao, id_conta, id_consulta))
 
-            for id_procedimento, quantidade in itens:
+            for id_procedimento, quantidade in c.itens:
                 cur.execute(
                     "INSERT INTO consulta_procedimento (id_consulta, id_procedimento, quantidade, valor_unitario) "
                     "SELECT %s, id_procedimento, %s, valor FROM procedimento WHERE id_procedimento = %s",
@@ -255,17 +256,17 @@ class PagamentoDAO:
             return _tuplas(cur.fetchall())
 
 
-    def inserir(self, dados):
+    def inserir(self, p):
         with transacao() as cur:
             cur.execute(
                 """
                 INSERT INTO pagamento (data_pagamento, valor_pago, forma_pagamento,
                                        possui_convenio, valor_convenio, id_conta)
-                VALUES (%(data_pagamento)s, %(valor_pago)s, %(forma_pagamento)s,
-                        %(possui_convenio)s, %(valor_convenio)s, %(id_conta)s)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id_pagamento
                 """,
-                dados)
+                (p.data_pagamento, p.valor_pago, p.forma_pagamento,
+                 p.possui_convenio, p.valor_convenio, p.id_conta))
             return cur.fetchone()["id_pagamento"]
 
     def contas_em_aberto(self, limite=10):
@@ -316,7 +317,8 @@ class AtendimentoDAO:
                 "WHERE c.id_consulta = %s", (id_consulta,))
             return cur.fetchone()
 
-    def salvar(self, id_consulta, sintomas, diagnostico, prescricao, itens):
+    def salvar(self, a):
+        id_consulta = a.id_consulta
         with transacao() as cur:
             cur.execute("SELECT status, id_conta FROM consulta WHERE id_consulta = %s FOR UPDATE",
                         (id_consulta,))
@@ -328,11 +330,11 @@ class AtendimentoDAO:
 
 
             cur.execute("UPDATE consulta SET sintomas = %s, diagnostico = %s, prescricao = %s "
-                        "WHERE id_consulta = %s", (sintomas, diagnostico, prescricao, id_consulta))
+                        "WHERE id_consulta = %s", (a.sintomas, a.diagnostico, a.prescricao, id_consulta))
 
 
             cur.execute("DELETE FROM consulta_procedimento WHERE id_consulta = %s", (id_consulta,))
-            for id_procedimento, quantidade, valor_unitario in itens:
+            for id_procedimento, quantidade, valor_unitario in a.itens:
                 cur.execute(
                     "INSERT INTO consulta_procedimento (id_consulta, id_procedimento, quantidade, valor_unitario) "
                     "VALUES (%s, %s, %s, %s)", (id_consulta, id_procedimento, quantidade, valor_unitario))

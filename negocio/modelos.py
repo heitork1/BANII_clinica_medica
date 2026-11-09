@@ -36,3 +36,32 @@ class Consulta:
     id_sala: int
     data_hora: datetime
     status: str = "AGENDADA"
+
+
+@dataclass
+class Pagamento:
+    id_conta: int
+    data_pagamento: date
+    forma_pagamento: str
+    valor_pago: float = 0
+    possui_convenio: bool = False
+    valor_convenio: float = 0
+
+
+@dataclass
+class Conta:
+    id_consulta: int
+    valor_consulta: float
+    sintomas: Optional[str] = None
+    diagnostico: Optional[str] = None
+    prescricao: Optional[str] = None
+    itens: List[tuple] = field(default_factory=list)
+
+
+@dataclass
+class Atendimento:
+    id_consulta: int
+    sintomas: Optional[str] = None
+    diagnostico: Optional[str] = None
+    prescricao: Optional[str] = None
+    itens: List[tuple] = field(default_factory=list)
