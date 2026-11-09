@@ -316,10 +316,8 @@ class AbaConsultas(ttk.Frame):
         if not sel or not self.st.get():
             messagebox.showwarning("Atenção", "Selecione uma consulta e um status.")
             return
-        print(f"self:{sel}")
         valores = self.tab.item(sel[0])["values"]
-        print(f"self.tab.item: {self.tab.item(sel[0])}")
-        print(f"valores: {valores}")
+
         id_c = int(valores[0])
         novo_status = self.st.get()
 

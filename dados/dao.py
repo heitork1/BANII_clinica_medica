@@ -255,38 +255,6 @@ class PagamentoDAO:
             return _tuplas(cur.fetchall())
 
 
-    def buscar_conta(self, id_conta):
-        with transacao() as cur:
-            cur.execute(
-                f"""
-                SELECT ct.id_conta, ct.valor_consulta, ct.valor_procedimento,
-                    COALESCE(ct.valor_total, 0) AS valor_total,
-                    COALESCE(sum(pg.valor_pago), 0) AS pago_paciente,
-                    COALESCE(sum(pg.valor_convenio), 0) AS pago_convenio,
-                    COALESCE(ct.valor_total, 0) - {SOMA_PAGA} AS saldo,
-                    count(pg.id_pagamento) AS quantidade_pagamentos
-                FROM conta ct
-                LEFT JOIN pagamento pg ON pg.id_conta = ct.id_conta
-                WHERE ct.id_conta = %s
-                GROUP BY ct.id_conta
-                """,
-                (id_conta,))
-            return cur.fetchone()
-
-    def listar_por_conta(self, id_conta):
-        with transacao() as cur:
-            cur.execute(
-                """
-                SELECT id_pagamento, data_pagamento, valor_pago, forma_pagamento,
-                    possui_convenio, valor_convenio,
-                    COALESCE(valor_pago, 0) + COALESCE(valor_convenio, 0) AS total
-                FROM pagamento
-                WHERE id_conta = %s
-                ORDER BY data_pagamento, id_pagamento
-                """,
-                (id_conta,))
-            return cur.fetchall()
-
     def inserir(self, dados):
         with transacao() as cur:
             cur.execute(
@@ -299,12 +267,6 @@ class PagamentoDAO:
                 """,
                 dados)
             return cur.fetchone()["id_pagamento"]
-
-    def excluir(self, id_pagamento, id_conta):
-        with transacao() as cur:
-            cur.execute("DELETE FROM pagamento WHERE id_pagamento = %s AND id_conta = %s",
-                        (id_pagamento, id_conta))
-            return cur.rowcount > 0
 
     def contas_em_aberto(self, limite=10):
         with transacao() as cur:
@@ -376,7 +338,6 @@ class AtendimentoDAO:
                     "VALUES (%s, %s, %s, %s)", (id_consulta, id_procedimento, quantidade, valor_unitario))
 
 
-
             cur.execute(
                 f"SELECT COALESCE(ct.valor_total, 0) AS total, {SOMA_PAGA} AS pago "
                 "FROM conta ct LEFT JOIN pagamento pg ON pg.id_conta = ct.id_conta "
@@ -394,11 +355,6 @@ class UsuarioDAO:
             cur.execute(f"SELECT {COLUNAS} FROM usuario ORDER BY ativo DESC, nome")
             return cur.fetchall()
         
-    def buscar_por_id(self, id_usuario):
-        with transacao() as cur:
-            cur.execute(f"SELECT {COLUNAS} FROM usuario WHERE id_usuario = %s", (id_usuario,))
-            return cur.fetchone()
-
     def buscar_para_login(self, email):
         with transacao() as cur:
             cur.execute(
@@ -406,12 +362,6 @@ class UsuarioDAO:
                 (email,),
             )
             return cur.fetchone()
-
-    def buscar_senha_hash(self, id_usuario):
-        with transacao() as cur:
-            cur.execute("SELECT senha_hash FROM usuario WHERE id_usuario = %s", (id_usuario,))
-            linha = cur.fetchone()
-            return linha["senha_hash"] if linha else None
 
     def inserir(self, dados):
         with transacao() as cur:
@@ -434,18 +384,4 @@ class UsuarioDAO:
                  WHERE id_usuario = %(id_usuario)s
                 """,
                 {**dados, "id_usuario": id_usuario},
-            )
-
-    def alterar_senha(self, id_usuario, senha_hash):
-        with transacao() as cur:
-            cur.execute(
-                "UPDATE usuario SET senha_hash = %s WHERE id_usuario = %s",
-                (senha_hash, id_usuario),
-            )
-
-    def definir_ativo(self, id_usuario, ativo):
-        with transacao() as cur:
-            cur.execute(
-                "UPDATE usuario SET ativo = %s WHERE id_usuario = %s",
-                (ativo, id_usuario),
             )
