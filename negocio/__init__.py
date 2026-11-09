@@ -1,2 +1,0 @@
-class ErroNegocio(Exception):
-    pass

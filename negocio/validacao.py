@@ -1,7 +1,8 @@
 import re
 from datetime import datetime
 
-from negocio import ErroNegocio
+class ErroNegocio(Exception):
+    pass
 
 
 def somente_digitos(texto):
