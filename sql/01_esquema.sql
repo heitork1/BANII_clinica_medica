@@ -142,7 +142,7 @@ CREATE TABLE usuario (
 	email VARCHAR(100) UNIQUE NOT NULL,
 	senha_hash VARCHAR(255) NOT NULL,
 	perfil VARCHAR(10) NOT NULL
-		CHECK (perfil IN ('ADMIN', 'RECEPCAO', 'MEDICO')),
+		CHECK (perfil IN ('ADMIN', 'MEDICO')),
 	ativo BOOLEAN NOT NULL DEFAULT TRUE,
 	id_medico INTEGER UNIQUE REFERENCES medico(id_medico),
 

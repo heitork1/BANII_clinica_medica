@@ -115,9 +115,9 @@ INSERT INTO plano_convenio (id_paciente, id_convenio, numero_carteirinha, valida
 
 -- 6) Consultas já realizadas, cada uma com a sua conta -----------------------------------------
 -- As contas nascem com valor_procedimento 0; o gatilho 3 recalcula quando os procedimentos entram (passo 7).
--- Contas 1 a 8, na ordem das consultas realizadas 1 a 8.
+-- Contas 1 a 4, na ordem das consultas realizadas 1 a 4.
 INSERT INTO conta (valor_procedimento, valor_consulta) VALUES
-    (0, 200.00), (0, 300.00), (0, 200.00), (0, 180.00), (0, 250.00), (0, 300.00), (0, 180.00), (0, 200.00);
+    (0, 200.00), (0, 300.00), (0, 200.00), (0, 180.00);
 
 -- Datas fixas no passado, em dias e horários em que o médico atende.
 INSERT INTO consulta (data_hora_marcado, data_hora_realizado, status, sintomas, diagnostico, prescricao,
@@ -125,62 +125,44 @@ INSERT INTO consulta (data_hora_marcado, data_hora_realizado, status, sintomas, 
     ('2026-10-26 09:00', '2026-10-26 09:10', 'REALIZADA', 'Dor leve no peito e cansaço', 'Ansiedade, sem alteração no ECG', 'Repouso e retorno em 30 dias', 1, 1, 1, 1),
     ('2026-10-27 14:00', '2026-10-27 14:05', 'REALIZADA', 'Falta de ar ao subir escadas', 'Insuficiência cardíaca leve', 'Losartana 50 mg, 1 vez ao dia', 2, 2, 2, 2),
     ('2026-10-28 10:00', '2026-10-28 10:15', 'REALIZADA', 'Corte profundo na mão', 'Ferimento corto-contuso', 'Limpar e trocar o curativo a cada 2 dias', 4, 1, 1, 3),
-    ('2026-10-29 09:00', '2026-10-29 09:20', 'REALIZADA', 'Vacinação em dia', 'Criança saudável', 'Vacina aplicada, retorno em 6 meses', 5, 3, 3, 4),
-    ('2026-10-27 15:00', '2026-10-27 15:10', 'REALIZADA', 'Mancha escura na pele', 'Nevo suspeito, biópsia realizada', 'Aguardar o resultado da biópsia', 7, 4, 4, 5),
-    ('2026-10-30 10:00', '2026-10-30 10:00', 'REALIZADA', 'Palpitações ocasionais', 'Sem alterações', 'Reduzir cafeína e retornar se persistir', 3, 2, 2, 6),
-    ('2026-11-02 08:30', '2026-11-02 08:40', 'REALIZADA', 'Febre e dor de garganta', 'Amigdalite', 'Amoxicilina por 7 dias', 6, 3, 3, 7),
-    ('2026-11-03 14:30', '2026-11-03 14:45', 'REALIZADA', 'Pontos da cirurgia', 'Cicatrização completa', 'Sem restrições', 8, 1, 1, 8);
+    ('2026-10-29 09:00', '2026-10-29 09:20', 'REALIZADA', 'Vacinação em dia', 'Criança saudável', 'Vacina aplicada, retorno em 6 meses', 5, 3, 3, 4);
 
 
 -- 7) Procedimentos realizados nessas consultas -------------------------------------------------
 -- valor_unitario é o preço da época (fica congelado mesmo que o cadastro mude depois).
--- As consultas 6 e 7 não tiveram procedimentos.
 INSERT INTO consulta_procedimento (id_consulta, id_procedimento, quantidade, valor_unitario) VALUES
     (1, 1, 1, 80.00),     -- Eletrocardiograma
     (2, 3, 1, 220.00),    -- Ecocardiograma
     (2, 1, 1, 80.00),     -- Eletrocardiograma
     (3, 2, 2, 30.00),     -- Curativo x2
-    (4, 7, 2, 60.00),     -- Aplicação de vacina x2
-    (5, 5, 1, 350.00),    -- Biópsia de pele
-    (8, 4, 1, 45.00);     -- Retirada de pontos
+    (4, 7, 2, 60.00);     -- Aplicação de vacina x2
 
 
 -- 8) Pagamentos --------------------------------------------------------------------------------
 -- Resultado nas telas Contas e Pagamentos:
---   Quitadas:  contas 1, 4 e 6
---   Parciais:  contas 2 e 5
---   Em aberto: contas 3, 7 e 8 (sem pagamento: servem para testar o botão Novo Pagamento)
+--   Quitada:   conta 1
+--   Parcial:   conta 2
+--   Em aberto: contas 3 e 4 (sem pagamento: servem para testar o botão Novo Pagamento)
 -- Pagamento com convênio: possui_convenio TRUE e valor_convenio preenchido.
 INSERT INTO pagamento (data_pagamento, valor_pago, forma_pagamento, possui_convenio, valor_convenio, id_conta) VALUES
     ('2026-10-26', 80.00, 'CARTAO', FALSE, 0, 1),
     ('2026-10-26', 0.00, 'PIX', TRUE, 200.00, 1),
-    ('2026-10-27', 0.00, 'PIX', TRUE, 300.00, 2),
-    ('2026-10-29', 120.00, 'CARTAO', FALSE, 0, 4),
-    ('2026-10-30', 0.00, 'PIX', TRUE, 180.00, 4),
-    ('2026-10-27', 250.00, 'DINHEIRO', FALSE, 0, 5),
-    ('2026-10-30', 300.00, 'DINHEIRO', FALSE, 0, 6);
+    ('2026-10-27', 0.00, 'PIX', TRUE, 300.00, 2);
 
 
 -- 9) Outras consultas (sem conta: ela só nasce quando a consulta é finalizada) -----------------
 -- Consultas de hoje, para a tela inicial. Os médicos 1 e 2 atendem todos os dias.
 INSERT INTO consulta (data_hora_marcado, status, id_paciente, id_medico, id_sala) VALUES
     (CURRENT_DATE + TIME '09:00', 'CONFIRMADA', 4, 1, 1),
-    (CURRENT_DATE + TIME '10:30', 'AGENDADA',   8, 1, 1),
     (CURRENT_DATE + TIME '14:00', 'AGENDADA',   1, 1, 1),
     (CURRENT_DATE + TIME '16:00', 'CANCELADA',  7, 1, 1),
-    (CURRENT_DATE + TIME '09:30', 'AGENDADA',   2, 2, 2),
-    (CURRENT_DATE + TIME '15:00', 'CONFIRMADA', 3, 2, 2);
+    (CURRENT_DATE + TIME '09:30', 'AGENDADA',   2, 2, 2);
 
--- Consultas na semana que vem (segunda a quinta), em dias e horários em que cada médico atende.
+-- Consultas na semana que vem (segunda e terça), em dias e horários em que cada médico atende.
 INSERT INTO consulta (data_hora_marcado, status, id_paciente, id_medico, id_sala) VALUES
-    (date_trunc('week', CURRENT_DATE::timestamp) + INTERVAL '7 days 8 hours 30 minutes',  'AGENDADA',   5, 3, 3),  -- segunda
-    (date_trunc('week', CURRENT_DATE::timestamp) + INTERVAL '8 days 14 hours 30 minutes', 'AGENDADA',   7, 4, 4),  -- terça
-    (date_trunc('week', CURRENT_DATE::timestamp) + INTERVAL '9 days 10 hours',            'CONFIRMADA', 2, 2, 2),  -- quarta
-    (date_trunc('week', CURRENT_DATE::timestamp) + INTERVAL '10 days 15 hours',           'AGENDADA',   1, 4, 4);  -- quinta
+    (date_trunc('week', CURRENT_DATE::timestamp) + INTERVAL '7 days 8 hours 30 minutes',  'AGENDADA', 5, 3, 3),  -- segunda
+    (date_trunc('week', CURRENT_DATE::timestamp) + INTERVAL '8 days 14 hours 30 minutes', 'AGENDADA', 7, 4, 4);  -- terça
 
--- Consultas passadas que não foram realizadas: faltou, cancelada e uma ainda como agendada
--- (esta serve para testar o botão Aplicar com o status REALIZADA).
+-- Consulta passada ainda como agendada (serve para testar o botão Aplicar com o status REALIZADA).
 INSERT INTO consulta (data_hora_marcado, status, id_paciente, id_medico, id_sala) VALUES
-    ('2026-11-03 09:00', 'FALTOU',    6, 3, 3),
-    ('2026-11-04 15:00', 'CANCELADA', 3, 2, 2),
-    ('2026-11-05 11:00', 'AGENDADA',  7, 1, 1);
+    ('2026-11-05 11:00', 'AGENDADA', 7, 1, 1);
