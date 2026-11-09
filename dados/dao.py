@@ -1,12 +1,10 @@
-"""Camada de dados: acesso às tabelas (DAOs). Só SQL, sem regras de negócio."""
 from .conexao import transacao, ErroBanco
 
 
 def _tuplas(linhas):
-    """Converte linhas dict em tuplas (formato que a interface antiga espera)."""
     return [tuple(l.values()) for l in linhas]
 
-# Total já pago de uma conta (paciente + convênio); usar com GROUP BY ct.id_conta.
+
 SOMA_PAGA = "COALESCE(sum(COALESCE(pg.valor_pago, 0) + COALESCE(pg.valor_convenio, 0)), 0)"
 
 
@@ -21,7 +19,7 @@ class PacienteDAO:
             for tel in p.telefones:
                 cur.execute("INSERT INTO telefone_paciente (numero_telefone, id_paciente) VALUES (%s,%s)",
                             (tel, id_paciente))
-            if p.id_convenio:  # mesma transação: se a carteirinha falhar, o paciente também não é gravado
+            if p.id_convenio:
                 cur.execute(
                     "INSERT INTO plano_convenio (id_paciente, id_convenio, numero_carteirinha, validade, tipo_plano) "
                     "VALUES (%s,%s,%s,%s,%s)",
@@ -106,7 +104,6 @@ class MedicoDAO:
 
 
     def horarios_do_medico(self, id_medico):
-        """Horários em que um médico atende: lista de (dia_semana, 'HH:MM-HH:MM')."""
         with transacao() as cur:
             cur.execute(
                 "SELECT h.dia_semana, to_char(h.hora_inicio,'HH24:MI') || '-' || to_char(h.hora_fim,'HH24:MI') "
@@ -124,7 +121,6 @@ class SalaDAO:
 
 class ConsultaDAO:
     def inserir(self, c):
-        """Agenda a consulta (sem conta: ela só é gerada quando a consulta é finalizada)."""
         with transacao() as cur:
             cur.execute(
                 "INSERT INTO consulta (data_hora_marcado, status, id_paciente, id_medico, id_sala) "
@@ -160,9 +156,6 @@ class ContaDAO:
             return cur.fetchall()
 
     def finalizar_consulta(self, id_consulta, valor_consulta, sintomas, diagnostico, prescricao, itens):
-        """Numa única transação: gera a conta, liga à consulta, marca REALIZADA e grava os procedimentos.
-        O gatilho fn_atualiza_valor_procedimento_conta recalcula conta.valor_procedimento sozinho,
-        por isso a consulta precisa estar ligada à conta ANTES de inserir os procedimentos."""
         with transacao() as cur:
             cur.execute("SELECT status, id_conta FROM consulta WHERE id_consulta = %s FOR UPDATE",
                         (id_consulta,))
@@ -177,7 +170,7 @@ class ContaDAO:
                 cur.execute("INSERT INTO conta (valor_procedimento, valor_consulta) VALUES (0, %s) "
                             "RETURNING id_conta AS id", (valor_consulta,))
                 id_conta = cur.fetchone()["id"]
-            else:  # consulta antiga, que já tinha conta criada no agendamento
+            else:
                 cur.execute("UPDATE conta SET valor_consulta = %s WHERE id_conta = %s",
                             (valor_consulta, id_conta))
 
@@ -188,7 +181,7 @@ class ContaDAO:
                 (sintomas, diagnostico, prescricao, id_conta, id_consulta))
 
             for id_procedimento, quantidade in itens:
-                # valor_unitario guarda o preço da época: mudar o cadastro depois não altera contas antigas
+
                 cur.execute(
                     "INSERT INTO consulta_procedimento (id_consulta, id_procedimento, quantidade, valor_unitario) "
                     "SELECT %s, id_procedimento, %s, valor FROM procedimento WHERE id_procedimento = %s",
@@ -198,7 +191,6 @@ class ContaDAO:
             return id_conta
 
     def listar(self, situacao=None):
-        """Todas as contas com consulta, paciente, médico, total pago, saldo e situação."""
         filtro = "WHERE t.situacao = %s" if situacao else ""
         sql = f"""
             SELECT * FROM (
@@ -230,8 +222,6 @@ class ContaDAO:
 class PagamentoDAO:
     def listar(self, data_ini=None, data_fim=None, forma=None, convenio=None,
                id_paciente=None, id_medico=None):
-        """Lista pagamentos aplicando só os filtros informados (None = não filtra).
-        Paciente e médico vêm da consulta que originou a conta."""
         where, params = [], []
         if data_ini:
             where.append("pg.data_pagamento >= %s"); 
@@ -266,10 +256,9 @@ class PagamentoDAO:
             cur.execute(sql, params)
             return _tuplas(cur.fetchall())
 
-    # ---- Operações sobre os pagamentos de UMA conta (base do futuro modal de pagamentos) ----
+
 
     def buscar_conta(self, id_conta):
-        """Totais da conta: valor, quanto o paciente e o convênio já pagaram, e o saldo."""
         with transacao() as cur:
             cur.execute(
                 f"""
@@ -288,7 +277,6 @@ class PagamentoDAO:
             return cur.fetchone()
 
     def listar_por_conta(self, id_conta):
-        """Pagamentos de uma conta, do mais antigo para o mais novo (linhas como dict)."""
         with transacao() as cur:
             cur.execute(
                 """
@@ -303,8 +291,6 @@ class PagamentoDAO:
             return cur.fetchall()
 
     def inserir(self, dados):
-        """dados: dict com data_pagamento, valor_pago, forma_pagamento, possui_convenio,
-        valor_convenio e id_conta. O gatilho fn_valida_pagamento recusa dados inválidos."""
         with transacao() as cur:
             cur.execute(
                 """
@@ -318,14 +304,12 @@ class PagamentoDAO:
             return cur.fetchone()["id_pagamento"]
 
     def excluir(self, id_pagamento, id_conta):
-        """Apaga o pagamento só se ele pertencer à conta informada. Devolve True se apagou."""
         with transacao() as cur:
             cur.execute("DELETE FROM pagamento WHERE id_pagamento = %s AND id_conta = %s",
                         (id_pagamento, id_conta))
             return cur.rowcount > 0
 
     def contas_em_aberto(self, limite=10):
-        """Consultas realizadas cuja conta ainda tem saldo, das mais antigas para as mais novas."""
         with transacao() as cur:
             cur.execute(
                 f"""
@@ -364,7 +348,6 @@ class AtendimentoDAO:
             return cur.fetchall()
 
     def buscar(self, id_consulta):
-        """Dados da consulta que a janela de atendimento mostra (devolve None se não existir)."""
         with transacao() as cur:
             cur.execute(
                 "SELECT c.id_consulta, c.status, c.sintomas, c.diagnostico, c.prescricao, "
@@ -375,9 +358,6 @@ class AtendimentoDAO:
             return cur.fetchone()
 
     def salvar(self, id_consulta, sintomas, diagnostico, prescricao, itens):
-        """Salva o prontuário e a lista de procedimentos de uma consulta REALIZADA, numa transação só.
-        itens: lista de (id_procedimento, quantidade, valor_unitario).
-        O gatilho fn_atualiza_valor_procedimento_conta recalcula conta.valor_procedimento sozinho."""
         with transacao() as cur:
             cur.execute("SELECT status, id_conta FROM consulta WHERE id_consulta = %s FOR UPDATE",
                         (id_consulta,))
@@ -387,19 +367,19 @@ class AtendimentoDAO:
             if consulta["status"] != "REALIZADA":
                 raise ErroBanco("Só dá para editar o atendimento de uma consulta realizada.")
 
-            # 1) prontuário
+
             cur.execute("UPDATE consulta SET sintomas = %s, diagnostico = %s, prescricao = %s "
                         "WHERE id_consulta = %s", (sintomas, diagnostico, prescricao, id_consulta))
 
-            # 2) procedimentos: apaga a lista antiga e grava a nova (é o jeito mais simples de editar)
+
             cur.execute("DELETE FROM consulta_procedimento WHERE id_consulta = %s", (id_consulta,))
             for id_procedimento, quantidade, valor_unitario in itens:
                 cur.execute(
                     "INSERT INTO consulta_procedimento (id_consulta, id_procedimento, quantidade, valor_unitario) "
                     "VALUES (%s, %s, %s, %s)", (id_consulta, id_procedimento, quantidade, valor_unitario))
 
-            # 3) o total novo da conta não pode ficar menor do que já foi pago.
-            #    Se ficar, o erro desfaz tudo (prontuário e procedimentos).
+
+
             cur.execute(
                 f"SELECT COALESCE(ct.valor_total, 0) AS total, {SOMA_PAGA} AS pago "
                 "FROM conta ct LEFT JOIN pagamento pg ON pg.id_conta = ct.id_conta "

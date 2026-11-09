@@ -1,4 +1,3 @@
-"""Camada de apresentação (Tkinter): só captura entradas e exibe resultados."""
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
@@ -15,9 +14,6 @@ PERMISSOES = {
 }
 
 def executar(acao):
-    """Chama `acao` (uma função sem argumentos) e devolve o resultado dela.
-    Se lançar ErroNegocio/ErroBanco, mostra a mensagem numa caixa e devolve None.
-    Não agenda nada por si: só protege a chamada com try/except."""
     try:
         return acao()
     except (ErroNegocio, ErroBanco) as e:
@@ -48,24 +44,21 @@ def campo(pai, rotulo, linha, largura=30):
 
 
 def moeda(valor):
-    """1234.5 -> 'R$ 1.234,50'."""
     return "R$ " + f"{float(valor or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def id_de(texto):
-    """Extrai o id de um item de combo no formato '12 - Maria' -> 12 (vazio -> None)."""
     return int(texto.split(" - ")[0]) if texto else None
 
 
 class AbaInicio(ttk.Frame):
-    """Tela inicial: saudação, data de hoje e boas-vindas."""
 
     def __init__(self, pai):
         super().__init__(pai)
         hoje = datetime.now()
         saudacao = "Bom dia!" if hoje.hour < 12 else ("Boa tarde!" if hoje.hour < 18 else "Boa noite!")
         centro = ttk.Frame(self)
-        centro.pack(expand=True)  # sem fill: o bloco fica centralizado na aba
+        centro.pack(expand=True)
         ttk.Label(centro, text=saudacao, font=("Helvetica", 22, "bold")).pack()
         ttk.Label(centro, text=f"{hoje.day}/{hoje.month}/{hoje.year}", font=("Helvetica", 11),
                   foreground="#666666").pack(pady=(2, 16))
@@ -92,7 +85,7 @@ class AbaPacientes(ttk.Frame):
         self.tels = campo(f, "Telefones (separe por vírgula)", 7, 35)
         ttk.Button(f, text="Cadastrar", command=self.cadastrar).grid(row=8, column=1, sticky="w", pady=4)
 
-        # Carteirinha do convênio (opcional): grava uma linha em plano_convenio junto com o paciente
+
         cv = ttk.LabelFrame(f, text="Convênio (opcional)")
         cv.grid(row=0, column=2, rowspan=5, sticky="n", padx=16)
         ttk.Label(cv, text="Convênio").grid(row=0, column=0, sticky="e", padx=4, pady=2)
@@ -115,7 +108,6 @@ class AbaPacientes(ttk.Frame):
         self.atualizar()
 
     def carregar_convenios(self):
-        """Lê os convênios do banco (cadastrados direto nele) e mantém a escolha atual, se ainda existir."""
         convenios = executar(self.svc.convenios) or []
         atual = self.cb_conv.get()
         self.cb_conv["values"] = [self.NENHUM] + [f"{i} - {n}" for i, n in convenios]
@@ -123,7 +115,6 @@ class AbaPacientes(ttk.Frame):
         self.ajustar_convenio()
 
     def ajustar_convenio(self):
-        """Sem convênio escolhido: limpa e bloqueia os campos da carteirinha."""
         tem = self.cb_conv.get() != self.NENHUM
         for e in (self.carteirinha, self.validade, self.plano):
             e.config(state="normal")
@@ -136,7 +127,7 @@ class AbaPacientes(ttk.Frame):
 
     def cadastrar(self):
         def chamar_servico():
-            # PacienteService.cadastrar valida os dados e grava no banco
+
             return self.svc.cadastrar(
                 self.nome.get(), self.cpf.get(), self.nasc.get(), self.rg.get(), self.sexo.get(),
                 self.end.get(), self.email.get(), self.tels.get(),
@@ -148,7 +139,7 @@ class AbaPacientes(ttk.Frame):
             for e in (self.nome, self.cpf, self.nasc, self.rg, self.end, self.email, self.tels):
                 e.delete(0, "end")
             self.cb_conv.set(self.NENHUM)
-            self.ajustar_convenio()  # limpa e bloqueia a carteirinha
+            self.ajustar_convenio()
             messagebox.showinfo("Pronto", "Paciente cadastrado.")
             self.atualizar()
 
@@ -204,7 +195,7 @@ class AbaMedicos(ttk.Frame):
         hor = [self.hor[i][0] for i in self.lb_hor.curselection()]
 
         def chamar_servico():
-            # MedicoService.cadastrar valida os dados e grava no banco
+
             return self.svc.cadastrar(self.nome.get(), self.crm.get(), self.pct.get(),
                                       self.tel.get(), esp, hor)
 
@@ -234,7 +225,7 @@ class AbaConsultas(ttk.Frame):
         self.hora = campo(f, "Hora* (HH:MM)", 4, 8)
         ttk.Button(f, text="Agendar", command=self.ao_clicar_agendar).grid(row=5, column=1, sticky="w", pady=4)
 
-        # À direita do formulário: horários do médico escolhido (atualiza quando troca o médico).
+
         self.lbl_horarios = ttk.Label(f, text="Selecione um médico para ver os horários.", justify="left")
         self.lbl_horarios.grid(row=0, column=2, rowspan=5, sticky="nw", padx=20)
         self.cb["Médico"].bind("<<ComboboxSelected>>", self.ao_escolher_medico)
@@ -253,7 +244,6 @@ class AbaConsultas(ttk.Frame):
         self.atualizar()
 
     def ao_escolher_medico(self, evento):
-        """Quando o usuário escolhe um médico no combo, mostra os horários de atendimento dele."""
         id_medico = id_de(self.cb["Médico"].get())
 
         def buscar_horarios():
@@ -264,10 +254,8 @@ class AbaConsultas(ttk.Frame):
             self.lbl_horarios.config(text=texto)
 
     def consulta_do_botao(self, evento):
-        """Se o mouse está sobre o 'botão' Atendimento de uma consulta REALIZADA, devolve o id dela.
-        Senão, devolve None."""
-        linha = self.tab.identify_row(evento.y)          # qual linha está sob o mouse
-        coluna = self.tab.identify_column(evento.x)      # qual coluna: "#1", "#2", ... "#8"
+        linha = self.tab.identify_row(evento.y)
+        coluna = self.tab.identify_column(evento.x)
         if not linha or coluna != "#8":
             return None
         valores = self.tab.item(linha)["values"]
@@ -281,7 +269,6 @@ class AbaConsultas(ttk.Frame):
             JanelaAtendimento(self, id_consulta, self.atualizar)
 
     def ao_mover_o_mouse(self, evento):
-        """Sobre o 'botão' o cursor vira uma mãozinha; fora dele, volta ao normal."""
         if self.consulta_do_botao(evento):
             self.tab.config(cursor="hand2")
         else:
@@ -303,21 +290,20 @@ class AbaConsultas(ttk.Frame):
         for item in self.tab.get_children():
             valores = list(self.tab.item(item)["values"])
             if valores[5] == "REALIZADA":
-                valores = valores[:7] + ["[ Atendimento ]"]   # os colchetes dão cara de botão
+                valores = valores[:7] + ["[ Atendimento ]"]   
                 self.tab.item(item, values=valores)
 
     def ao_clicar_agendar(self):
-        """Handler do botão 'Agendar': lê o formulário, chama o serviço e atualiza a tela."""
-        # Os combos guardam "12 - Maria"; id_de extrai só o número 12.
+
         id_paciente = id_de(self.cb["Paciente"].get())
         id_medico = id_de(self.cb["Médico"].get())
         id_sala = id_de(self.cb["Sala"].get())
 
         def chamar_servico():
-            # AgendaService.agendar valida os dados e grava no banco (ConsultaDAO.inserir)
+
             return self.agenda.agendar(id_paciente, id_medico, id_sala, self.data.get(), self.hora.get())
 
-        # executar() roda chamar_servico e mostra caixa de erro se ErroNegocio/ErroBanco
+
         consulta_id = executar(chamar_servico)
         if consulta_id:
             messagebox.showinfo("Pronto", "Consulta agendada.")
@@ -333,7 +319,7 @@ class AbaConsultas(ttk.Frame):
         novo_status = self.st.get()
 
         if novo_status == "REALIZADA":
-            # Consulta realizada gera conta: o médico informa os detalhes numa janela própria.
+
             if valores[5] == "REALIZADA":
                 messagebox.showwarning("Atenção", "Esta consulta já foi realizada e a conta já foi gerada.")
                 return
@@ -348,8 +334,6 @@ class AbaConsultas(ttk.Frame):
         self.atualizar()
 
 class JanelaAtendimento(tk.Toplevel):
-    """Janela (modal) do atendimento de uma consulta REALIZADA:
-    mostra e permite editar o prontuário (sintomas, diagnóstico, prescrição) e os procedimentos realizados."""
 
     def __init__(self, pai, id_consulta, ao_salvar):
         super().__init__(pai)
@@ -368,8 +352,8 @@ class JanelaAtendimento(tk.Toplevel):
             return
 
         self.title("Atendimento")
-        self.transient(pai.winfo_toplevel())  # fica na frente da janela principal
-        self.grab_set()                       # bloqueia a janela de trás até fechar esta
+        self.transient(pai.winfo_toplevel())
+        self.grab_set()
 
         f = ttk.Frame(self)
         f.pack(fill="both", expand=True, padx=12, pady=12)
@@ -377,7 +361,7 @@ class JanelaAtendimento(tk.Toplevel):
         ttk.Label(f, text=resumo, font=("Helvetica", 10, "bold")).grid(
             row=0, column=0, columnspan=2, sticky="w", pady=(0, 8))
 
-        # 2) Prontuário: três caixas de texto, já preenchidas com o que está salvo.
+
         self.txt = {}
         for i, (chave, rotulo) in enumerate((("sintomas", "Sintomas"), ("diagnostico", "Diagnóstico"),
                                              ("prescricao", "Prescrição")), start=1):
@@ -388,22 +372,16 @@ class JanelaAtendimento(tk.Toplevel):
             caixa.grid(row=i, column=1, sticky="w", pady=2)
             self.txt[chave] = caixa
 
-        # 3) Procedimentos realizados: escolher, adicionar, e uma tabela com o que já foi feito.
+
         proc = ttk.LabelFrame(f, text="Procedimentos realizados")
         proc.grid(row=4, column=0, columnspan=2, sticky="nsew", pady=(8, 0))
         linha = ttk.Frame(proc)
-        # linha.pack(fill="x", padx=6, pady=6)
+
         self.cb_proc = ttk.Combobox(linha, width=48, state="readonly")
-        # self.cb_proc.pack(side="left")
-        # ttk.Label(linha, text="Qtd").pack(side="left", padx=(10, 2))
-        # self.qtd = ttk.Spinbox(linha, from_=1, to=999, width=5)
-        # self.qtd.set(1)
-        # self.qtd.pack(side="left")
-        # ttk.Button(linha, text="Adicionar", command=self.adicionar).pack(side="left", padx=6)
 
         self.tab = tabela(proc, ("Procedimento", "Qtd", "Valor unit.", "Subtotal"), (280, 50, 90, 90))
         self.tab.configure(height=5)
-        # ttk.Button(proc, text="Remover selecionado", command=self.remover).pack(anchor="e", padx=6, pady=(0, 6))
+        ttk.Button(proc, text="Remover selecionado", command=self.remover).pack(anchor="e", padx=6, pady=(0, 6))
 
         self.lbl_total = ttk.Label(f, text="", font=("Helvetica", 11, "bold"))
         self.lbl_total.grid(row=5, column=0, columnspan=2, sticky="e", pady=(8, 0))
@@ -411,16 +389,16 @@ class JanelaAtendimento(tk.Toplevel):
         botoes = ttk.Frame(f)
         botoes.grid(row=6, column=0, columnspan=2, sticky="e", pady=(10, 0))
         ttk.Button(botoes, text="Fechar", command=self.destroy).pack(side="left", padx=4)
-        # ttk.Button(botoes, text="Salvar", command=self.salvar).pack(side="left")
+        ttk.Button(botoes, text="Salvar", command=self.salvar).pack(side="left")
 
-        # 4) Carrega o combo de procedimentos e a tabela com o que a consulta já tem.
+
         lista = executar(ContaService().procedimentos) or []
         for p in lista:
             self.catalogo[p["id_procedimento"]] = p
         self.cb_proc["values"] = [f"{p['id_procedimento']} - {p['descricao']} ({moeda(p['valor'])})"
                                   for p in lista]
         for p in dados["procedimentos"]:
-            # usa o valor_unitario já salvo: mudar o preço no cadastro não altera atendimentos antigos
+
             self.itens[p["id_procedimento"]] = {"descricao": p["descricao"], "quantidade": p["quantidade"],
                                                 "valor": p["valor_unitario"]}
         self.redesenhar()
@@ -438,7 +416,7 @@ class JanelaAtendimento(tk.Toplevel):
             return
         id_p = id_de(self.cb_proc.get())
         if id_p in self.itens:
-            # o mesmo procedimento de novo: soma na quantidade (a tabela guarda um por procedimento)
+
             self.itens[id_p]["quantidade"] += qtd
         else:
             p = self.catalogo[id_p]
@@ -450,12 +428,11 @@ class JanelaAtendimento(tk.Toplevel):
         sel = self.tab.selection()
         if not sel:
             return
-        id_p = list(self.itens)[self.tab.index(sel[0])]  # a linha N da tabela é o item N do dicionário
+        id_p = list(self.itens)[self.tab.index(sel[0])]
         del self.itens[id_p]
         self.redesenhar()
 
     def redesenhar(self):
-        """Desenha a tabela a partir de self.itens e atualiza o total."""
         linhas = []
         total = 0
         for i in self.itens.values():
@@ -483,8 +460,6 @@ class JanelaAtendimento(tk.Toplevel):
 
 
 class JanelaFinalizarConta(tk.Toplevel):
-    """Janela (modal) aberta ao marcar uma consulta como REALIZADA: coleta os detalhes da conta
-    (valor da consulta e procedimentos realizados) e, ao finalizar, gera a conta da consulta."""
 
     def __init__(self, pai, id_consulta, resumo, ao_finalizar):
         super().__init__(pai)
@@ -493,9 +468,9 @@ class JanelaFinalizarConta(tk.Toplevel):
         self.grab_set()
         self.svc = ContaService()
         self.id_consulta = id_consulta
-        self.ao_finalizar = ao_finalizar   # chamada depois de gerar a conta (atualiza a lista de consultas)
-        self.catalogo = {}                 # id_procedimento -> dict do banco (descricao, valor)
-        self.itens = {}                    # id_procedimento -> quantidade escolhida
+        self.ao_finalizar = ao_finalizar
+        self.catalogo = {}
+        self.itens = {}
 
         f = ttk.Frame(self)
         f.pack(fill="both", expand=True, padx=12, pady=12)
@@ -559,7 +534,7 @@ class JanelaFinalizarConta(tk.Toplevel):
             messagebox.showwarning("Atenção", "Informe uma quantidade inteira maior que zero.", parent=self)
             return
         id_p = id_de(self.cb_proc.get())
-        # o mesmo procedimento escolhido de novo soma na quantidade (a tabela guarda um por procedimento)
+
         self.itens[id_p] = self.itens.get(id_p, 0) + qtd
         self.qtd.set(1)
         self.redesenhar()
@@ -629,7 +604,6 @@ class AbaContas(ttk.Frame):
         self.atualizar()
 
     def ao_exibir(self):
-        """Chamado ao abrir a aba: mostra as contas geradas desde a última vez."""
         self.atualizar()
 
     def atualizar(self):
@@ -646,15 +620,14 @@ class AbaContas(ttk.Frame):
 
 
 class JanelaNovoPagamento(tk.Toplevel):
-    """Janela (modal) para registrar um pagamento de uma conta que ainda tem saldo."""
 
     def __init__(self, pai, ao_salvar):
         super().__init__(pai)
         self.title("Novo pagamento")
-        self.transient(pai.winfo_toplevel())  # fica na frente da janela principal
-        self.grab_set()                       # bloqueia a janela de trás até fechar esta
+        self.transient(pai.winfo_toplevel())
+        self.grab_set()
         self.svc = PagamentoService()
-        self.ao_salvar = ao_salvar            # função chamada depois de salvar (atualiza a lista)
+        self.ao_salvar = ao_salvar
 
         f = ttk.Frame(self)
         f.pack(padx=12, pady=12)
@@ -673,18 +646,17 @@ class JanelaNovoPagamento(tk.Toplevel):
         self.valor_pago = campo(f, "Valor pago pelo paciente (R$)", 3, 15)
 
         self.tem_convenio = tk.BooleanVar(value=False)
-        # command: toda vez que a caixa é marcada/desmarcada, chama self.ajustar_campo_convenio
+
         ttk.Checkbutton(f, text="Pago com convênio", variable=self.tem_convenio,
                         command=self.ajustar_campo_convenio).grid(row=4, column=1, sticky="w", pady=2)
         self.valor_convenio = campo(f, "Valor pago pelo convênio (R$)", 5, 15)
-        self.ajustar_campo_convenio()  # começa desabilitado, porque a caixa começa desmarcada
+        self.ajustar_campo_convenio()
 
         ttk.Button(f, text="Salvar", command=self.salvar).grid(row=6, column=1, sticky="w", pady=8)
 
         self.carregar_contas()
 
     def ajustar_campo_convenio(self):
-        """Caixa marcada: o campo aceita texto. Caixa desmarcada: limpa e bloqueia o campo."""
         if self.tem_convenio.get():
             self.valor_convenio.config(state="normal")
         else:
@@ -695,7 +667,7 @@ class JanelaNovoPagamento(tk.Toplevel):
         contas = executar(self.svc.contas_em_aberto)
         if contas is None:
             contas = []
-        # Cada item do combo fica "12 - Maria - 05/11/2026 - saldo R$ 100,00"; id_de pega o 12.
+
         self.cb_conta["values"] = [f"{i} - {texto}" for i, texto in contas]
 
     def salvar(self):
@@ -720,12 +692,12 @@ class AbaPagamentos(ttk.Frame):
         self.pac = PacienteService()
         self.med = MedicoService()
 
-        # Linha de cima: filtros à esquerda e o botão "Novo Pagamento" ao lado deles
+
         topo = ttk.Frame(self)
         topo.pack(fill="x", padx=6, pady=6)
         f = ttk.LabelFrame(topo, text="Filtros")
         f.pack(side="left")
-        # expand=True: o botão ganha todo o espaço que sobra à direita dos filtros e fica centralizado nele
+
         ttk.Button(topo, text="+Novo Pagamento", command=self.abrir_novo_pagamento).pack(side="left", expand=True)
 
         self.ini = campo(f, "Data inicial (DD/MM/AAAA)", 0, 15)
@@ -838,6 +810,7 @@ class TelaLogin(ttk.Frame):
         usuario = executar(chamar_servico)
         if usuario:
             self.on_sucesso(usuario)
+            
 def iniciar():
     raiz = tk.Tk()
     raiz.title("Clínica Médica")
@@ -855,7 +828,7 @@ def iniciar():
     )
 
     def abrir_sistema(usuario):
-        # login.destroy() 
+        login.destroy() 
         raiz.title(f"Clínica Médica - {usuario['nome']} ({usuario['perfil']})")
 
         nb = ttk.Notebook(raiz)
@@ -880,12 +853,8 @@ def iniciar():
                 aba.ao_exibir()
         nb.bind("<<NotebookTabChanged>>", ao_trocar_de_aba)
 
-    abrir_sistema({"id_usuario": 1,
-            "nome": 'admin',
-            "perfil": 'ADMIN',
-            "id_medico": 'NONE'})
-    # login = TelaLogin(raiz, abrir_sistema)
-    # login.pack(fill="both", expand=True)
+    login = TelaLogin(raiz, abrir_sistema)
+    login.pack(fill="both", expand=True)
 
 
     raiz.mainloop()

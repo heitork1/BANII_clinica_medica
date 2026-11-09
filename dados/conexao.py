@@ -1,4 +1,3 @@
-"""Camada de dados: conexão e controle de transação com o PostgreSQL."""
 import os
 from contextlib import contextmanager
 
@@ -7,14 +6,14 @@ from psycopg2.extras import RealDictCursor
 
 
 class ErroBanco(Exception):
-    """Erro vindo do banco (inclui as mensagens dos gatilhos)."""
+    pass
 
 
 def _config():
     return dict(
         host=os.getenv("PGHOST", "localhost"),
         port=os.getenv("PGPORT", "5432"),
-        dbname=os.getenv("PGDATABASE", "clinica"),
+        dbname=os.getenv("PGDATABASE", "clinicaMedica"),
         user=os.getenv("PGUSER", "postgres"),
         password=os.getenv("PGPASSWORD", "admin"),
     )
@@ -22,7 +21,6 @@ def _config():
 
 @contextmanager
 def transacao():
-    """Entrega um cursor (linhas como dict); confirma ao sair ou desfaz tudo se houver erro."""
     try:
         conn = psycopg2.connect(**_config())
     except psycopg2.Error as e:

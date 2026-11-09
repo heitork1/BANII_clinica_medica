@@ -1,9 +1,9 @@
 --dados para testar o login
 
 
-INSERT INTO usuario values ('1','admin', 'admin@admin.com', '123456', 'ADMIN', 'TRUE')
+INSERT INTO usuario values ('1','admin', 'admin@admin.com', '123456', 'ADMIN', 'TRUE');
 
-INSERT INTO usuario values ('2', 'medico', 'medico@medico.com', '123456', 'MEDICO', 'TRUE', 1)
+INSERT INTO usuario values ('2', 'medico', 'medico@medico.com', '123456', 'MEDICO', 'TRUE', 1);
 
 
 -- Dados de apoio para testar a aplicação (executar por último).

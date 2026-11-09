@@ -1,4 +1,3 @@
-"""Camada de negócio: validações e conversões de entrada."""
 import re
 from datetime import datetime
 
