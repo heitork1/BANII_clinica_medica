@@ -54,15 +54,15 @@ def id_de(texto):
 class AbaInicio(ttk.Frame):
 
     def __init__(self, pai):
-        super().__init__(pai)
+        super().__init__(pai, style="Verde.TFrame")
         hoje = datetime.now()
         saudacao = "Bom dia!" if hoje.hour < 12 else ("Boa tarde!" if hoje.hour < 18 else "Boa noite!")
-        centro = ttk.Frame(self)
+        centro = ttk.Frame(self, style="Verde.TFrame")
         centro.pack(expand=True)
-        ttk.Label(centro, text=saudacao, font=("Helvetica", 22, "bold")).pack()
+        ttk.Label(centro, text=saudacao, font=("Helvetica", 22, "bold"), style="VerdeTitulo.TLabel").pack()
         ttk.Label(centro, text=f"{hoje.day}/{hoje.month}/{hoje.year}", font=("Helvetica", 11),
-                  foreground="#666666").pack(pady=(2, 16))
-        ttk.Label(centro, text="Bem-vindo(a) à Clínica CCT", font=("Helvetica", 14)).pack()
+                  style="Verde.TLabel", foreground="#5F7A6A").pack(pady=(2, 16))
+        ttk.Label(centro, text="Bem-vindo(a) à Clínica CCT", font=("Helvetica", 14), style="Verde.TLabel").pack()
 
 
 class AbaPacientes(ttk.Frame):
@@ -789,25 +789,28 @@ class AbaPagamentos(ttk.Frame):
 
 class TelaLogin(ttk.Frame):
     def __init__(self, pai, on_sucesso):
-        super().__init__(pai)
+        super().__init__(pai, style="Verde.TFrame")
         self.on_sucesso = on_sucesso  
         self.auth = ServicoAutenticacao()
 
-        centro = ttk.Frame(self)
+        centro = ttk.Frame(self, style="Verde.TFrame")
         centro.pack(expand=True)
 
-        ttk.Label(centro, text="Clínica Médica", font=("Helvetica", 16, "bold")).pack(pady=(0, 16))
+        ttk.Label(centro, text="Clínica Médica", font=("Helvetica", 16, "bold"),
+                  style="VerdeTitulo.TLabel").pack(pady=(0, 16))
 
-        ttk.Label(centro, text="E-mail").pack(anchor="w")
+        ttk.Label(centro, text="E-mail", style="Verde.TLabel").pack(anchor="w")
         self.email = ttk.Entry(centro, width=30)
         self.email.pack(pady=(0, 10))
         self.email.focus()
 
-        ttk.Label(centro, text="Senha").pack(anchor="w")
+        ttk.Label(centro, text="Senha", style="Verde.TLabel").pack(anchor="w")
         self.senha = ttk.Entry(centro, width=30, show="*")
         self.senha.pack(pady=(0, 16))
         self.senha.bind("<Return>", lambda e: self.entrar())
-        ttk.Button(centro, text="Entrar", command=self.entrar).pack(fill="x")
+        tk.Button(centro, text="Entrar", command=self.entrar, bg="#2E7D4F", fg="white",
+                  activebackground="#1B5E3F", activeforeground="white", relief="flat",
+                  pady=4).pack(fill="x")
 
     def entrar(self):
         def chamar_servico():
@@ -823,6 +826,9 @@ def iniciar():
     raiz.geometry("1000x640")
 
     estilo = ttk.Style()
+    estilo.configure("Verde.TFrame", background="#F4FAF6")
+    estilo.configure("Verde.TLabel", background="#F4FAF6", foreground="#1F2D26")
+    estilo.configure("VerdeTitulo.TLabel", background="#F4FAF6", foreground="#1B5E3F")
 
     estilo.configure("TNotebook", tabposition="wn")
     estilo.configure("TNotebook.Tab", padding=[15,8], font=("Helvetica", 10), width=15, anchor="w")

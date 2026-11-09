@@ -1,4 +1,3 @@
-import os
 from contextlib import contextmanager
 
 import psycopg2
@@ -11,11 +10,11 @@ class ErroBanco(Exception):
 
 def _config():
     return dict(
-        host=os.getenv("PGHOST", "localhost"),
-        port=os.getenv("PGPORT", "5432"),
-        dbname=os.getenv("PGDATABASE", "clinicaMedica"),
-        user=os.getenv("PGUSER", "postgres"),
-        password=os.getenv("PGPASSWORD", "admin"),
+        host="localhost",
+        port="5432",
+        dbname="clinicaMedica",
+        user="postgres",
+        password="admin",
     )
 
 
