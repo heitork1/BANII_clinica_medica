@@ -37,7 +37,6 @@ class PacienteService:
                 raise ErroNegocio("Informe o número da carteirinha do convênio.")
             if len(carteirinha) > 50 or len(tipo_plano) > 50:
                 raise ErroNegocio("Número da carteirinha e tipo de plano aceitam até 50 caracteres.")
-
             if val and val < date.today():
                 raise ErroNegocio("A carteirinha está vencida. Informe uma validade futura ou deixe em branco.")
         return self.dao.inserir(Paciente(nome, cpf_fmt, nasc, rg.strip(), sexo, endereco.strip(),
@@ -89,7 +88,6 @@ class MedicoService:
     def horarios_do_medico(self, id_medico):
         if not id_medico:
             return "Selecione um médico para ver os horários."
-
         faixas_por_dia = {}
         for dia, faixa in self.dao.horarios_do_medico(id_medico):
             faixas_por_dia.setdefault(dia.upper(), []).append(faixa)
@@ -134,7 +132,6 @@ class ContaService:
 
 
 class AtendimentoService:
-
     def __init__(self):
         self.dao = AtendimentoDAO()
 
@@ -149,7 +146,6 @@ class AtendimentoService:
         for _, quantidade, _ in itens:
             if quantidade < 1:
                 raise ErroNegocio("A quantidade de cada procedimento deve ser pelo menos 1.")
-
         self.dao.salvar(id_consulta, sintomas.strip() or None, diagnostico.strip() or None,
                         prescricao.strip() or None, itens)
 
@@ -189,12 +185,10 @@ class PagamentoService:
         if forma not in FORMAS_PAGAMENTO:
             raise ErroNegocio("Selecione a forma de pagamento.")
         data_pagamento = parse_data(data)
-
         pago = parse_numero(valor_pago, "Valor pago") if valor_pago.strip() else 0
         convenio = 0
         if possui_convenio and valor_convenio.strip():
             convenio = parse_numero(valor_convenio, "Valor do convênio")
-
         return self.dao.inserir({
             "data_pagamento": data_pagamento,
             "valor_pago": pago,

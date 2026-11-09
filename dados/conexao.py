@@ -32,7 +32,7 @@ def transacao():
     except psycopg2.Error as e:
         if e.pgcode == "23505":
             raise ErroBanco("Registro duplicado (valor único já cadastrado).") from e
-        msg = (e.diag.message_primary if e.diag and e.diag.message_primary else str(e))
+        msg = e.diag.message_primary or str(e)
         raise ErroBanco(msg) from e
     finally:
         conn.close()

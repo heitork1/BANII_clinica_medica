@@ -13,7 +13,6 @@ class Paciente:
     endereco: str = ""
     email: str = ""
     telefones: List[str] = field(default_factory=list)
-
     id_convenio: Optional[int] = None
     carteirinha: str = ""
     validade: Optional[date] = None

@@ -4,7 +4,6 @@ from .conexao import transacao, ErroBanco
 def _tuplas(linhas):
     return [tuple(l.values()) for l in linhas]
 
-
 SOMA_PAGA = "COALESCE(sum(COALESCE(pg.valor_pago, 0) + COALESCE(pg.valor_convenio, 0)), 0)"
 
 
@@ -181,7 +180,6 @@ class ContaDAO:
                 (sintomas, diagnostico, prescricao, id_conta, id_consulta))
 
             for id_procedimento, quantidade in itens:
-
                 cur.execute(
                     "INSERT INTO consulta_procedimento (id_consulta, id_procedimento, quantidade, valor_unitario) "
                     "SELECT %s, id_procedimento, %s, valor FROM procedimento WHERE id_procedimento = %s",
@@ -255,7 +253,6 @@ class PagamentoDAO:
         with transacao() as cur:
             cur.execute(sql, params)
             return _tuplas(cur.fetchall())
-
 
 
     def buscar_conta(self, id_conta):

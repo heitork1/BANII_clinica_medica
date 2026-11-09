@@ -85,6 +85,7 @@ class AbaPacientes(ttk.Frame):
         self.tels = campo(f, "Telefones (separe por vírgula)", 7, 35)
         ttk.Button(f, text="Cadastrar", command=self.cadastrar).grid(row=8, column=1, sticky="w", pady=4)
 
+       
 
         cv = ttk.LabelFrame(f, text="Convênio (opcional)")
         cv.grid(row=0, column=2, rowspan=5, sticky="n", padx=16)
@@ -237,6 +238,7 @@ class AbaConsultas(ttk.Frame):
         self.st.pack(side="left", padx=4)
         ttk.Button(b, text="Aplicar", command=self.mudar_status).pack(side="left")
         ttk.Button(b, text="Atualizar listas", command=self.atualizar).pack(side="right")
+
         self.tab = tabela(self, ("ID", "Data/hora", "Paciente", "Médico", "Sala", "Status", "Total R$", ""),
                           (40, 100, 140, 140, 150, 90, 80, 110))
         self.tab.bind("<Button-1>", self.ao_clicar_na_tabela)
@@ -290,7 +292,7 @@ class AbaConsultas(ttk.Frame):
         for item in self.tab.get_children():
             valores = list(self.tab.item(item)["values"])
             if valores[5] == "REALIZADA":
-                valores = valores[:7] + ["[ Atendimento ]"]   
+                valores = valores[:7] + ["[ Atendimento ]"]
                 self.tab.item(item, values=valores)
 
     def ao_clicar_agendar(self):
@@ -314,7 +316,10 @@ class AbaConsultas(ttk.Frame):
         if not sel or not self.st.get():
             messagebox.showwarning("Atenção", "Selecione uma consulta e um status.")
             return
+        print(f"self:{sel}")
         valores = self.tab.item(sel[0])["values"]
+        print(f"self.tab.item: {self.tab.item(sel[0])}")
+        print(f"valores: {valores}")
         id_c = int(valores[0])
         novo_status = self.st.get()
 
@@ -479,6 +484,7 @@ class JanelaFinalizarConta(tk.Toplevel):
 
         self.valor_consulta = campo(f, "Valor da consulta (R$)*", 1, 15)
         self.valor_consulta.bind("<KeyRelease>", lambda e: self.atualizar_total())
+
 
         self.txt = {}
         for i, (chave, rotulo) in enumerate((("sintomas", "Sintomas"), ("diagnostico", "Diagnóstico"),
@@ -852,6 +858,7 @@ def iniciar():
             if hasattr(aba, "ao_exibir"):
                 aba.ao_exibir()
         nb.bind("<<NotebookTabChanged>>", ao_trocar_de_aba)
+
 
     login = TelaLogin(raiz, abrir_sistema)
     login.pack(fill="both", expand=True)
