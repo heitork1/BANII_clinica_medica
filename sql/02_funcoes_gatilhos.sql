@@ -52,7 +52,6 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    -- Mapeia o número do dia para o texto usado na tabela horario
     v_dia_semana := CASE EXTRACT(DOW FROM NEW.data_hora_marcado)::INT
         WHEN 0 THEN 'DOMINGO'
         WHEN 1 THEN 'SEGUNDA'

@@ -9,14 +9,14 @@ O sistema é um programa Python com telas em Tkinter e banco PostgreSQL, dividid
 | Camada | Arquivos | O que faz |
 | --- | --- | --- |
 | Apresentação | apresentacao/janela.py | Telas Tkinter. Lê o que o usuário digitou e mostra resultados e erros. |
-| Negócio | negocio/servicos.py, agenda.py, validacao.py | Valida os dados e aplica as regras. |
+| Negócio | negocio/servicos.py, modelos.py, validacao.py | Valida os dados e aplica as regras. |
 | Dados | dados/dao.py, conexao.py | Só SQL. Abre a conexão e executa as consultas. |
 | Banco | sql/01_esquema.sql, 02_funcoes_gatilhos.sql, 03_dados_exemplo.sql | Tabelas, gatilhos e dados de exemplo no PostgreSQL. |
 
 O caminho de um agendamento mostra as camadas trabalhando juntas:
 
 1. O botão Agendar chama `AbaConsultas.ao_clicar_agendar`, em janela.py.
-2. `AgendaService.agendar`, em agenda.py, valida os campos e junta data e hora.
+2. `AgendaService.agendar`, em servicos.py, valida os campos e junta data e hora.
 3. `ConsultaDAO.inserir`, em dao.py, faz o INSERT na tabela consulta.
 4. Os gatilhos do banco conferem conflito de agenda e horário do médico. Se recusarem, o erro volta como `ErroBanco` e a função `executar` mostra a mensagem numa caixa.
 
@@ -233,10 +233,10 @@ Onde: `ConsultaDAO.listar_de_hoje`, em dao.py. Troque a última linha do começo
 
 **DP3. Não deixar agendar consulta no passado**
 
-Onde: `AgendaService.agendar`, em agenda.py. A regra é de negócio, então fica no serviço.
+Onde: `AgendaService.agendar`, em servicos.py. A regra é de negócio, então fica no serviço.
 
 ```python
-from datetime import datetime, timedelta   # no topo: acrescente o datetime
+from datetime import date, datetime   # no topo de servicos.py: acrescente o datetime
 
 # em agendar, logo depois de calcular dh
 if dh < datetime.now():

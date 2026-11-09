@@ -3,8 +3,7 @@ from tkinter import ttk, messagebox
 from datetime import datetime
 
 from dados.conexao import ErroBanco
-from negocio.agenda import AgendaService, STATUS
-from negocio.servicos import (MedicoService, PacienteService, PagamentoService, ContaService, AtendimentoService,
+from negocio.servicos import (AgendaService, STATUS, MedicoService, PacienteService, PagamentoService, ContaService, AtendimentoService,
                               FORMAS_PAGAMENTO, SITUACOES_CONTA, ServicoAutenticacao)
 from negocio.validacao import ErroNegocio
 

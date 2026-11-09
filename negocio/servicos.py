@@ -1,9 +1,10 @@
 from datetime import date
 
-from dados.dao import PacienteDAO, MedicoDAO, SalaDAO, UsuarioDAO, PagamentoDAO, ContaDAO, AtendimentoDAO
-from .modelos import Paciente, Medico, Pagamento, Conta, Atendimento
-from .validacao import ErroNegocio, checa_senha, cpf_valido, dados_da_sessao, parse_data, parse_numero, somente_digitos
+from dados.dao import PacienteDAO, MedicoDAO, SalaDAO, ConsultaDAO, UsuarioDAO, PagamentoDAO, ContaDAO, AtendimentoDAO
+from .modelos import Paciente, Medico, Consulta, Pagamento, Conta, Atendimento
+from .validacao import ErroNegocio, checa_senha, cpf_valido, dados_da_sessao, parse_data, parse_data_hora, parse_numero, somente_digitos
 
+STATUS = ("AGENDADA", "CONFIRMADA", "REALIZADA", "CANCELADA", "FALTOU")
 DIAS_DA_SEMANA = ("SEGUNDA", "TERCA", "QUARTA", "QUINTA", "SEXTA", "SABADO", "DOMINGO")
 
 
@@ -100,6 +101,30 @@ class MedicoService:
         return "\n".join(linhas)
 
 SITUACOES_CONTA = ("Em aberto", "Parcial", "Quitada")
+
+
+class AgendaService:
+    def __init__(self):
+        self.dao = ConsultaDAO()
+
+    def agendar(self, id_paciente, id_medico, id_sala, data, hora):
+        if not (id_paciente and id_medico and id_sala):
+            raise ErroNegocio("Selecione paciente, médico e sala.")
+
+        dh = parse_data_hora(f"{data.strip()} {hora.strip()}")
+
+        return self.dao.inserir(Consulta(id_paciente, id_medico, id_sala, dh))
+
+    def mudar_status(self, id_consulta, status):
+        if status not in STATUS:
+            raise ErroNegocio("Status inválido.")
+        if status == "REALIZADA":
+            raise ErroNegocio("Para marcar como REALIZADA é preciso informar os dados da conta.")
+        self.dao.atualizar_status(id_consulta, status)
+
+    def listar(self):
+        return self.dao.listar()
+
 
 
 class ContaService:
