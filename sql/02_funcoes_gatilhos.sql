@@ -1,9 +1,4 @@
--- Funções e gatilhos em PL/pgSQL. Executar depois de Trabalho1_ClinicaMedica.sql.
--- O arquivo pode ser executado de novo: as funções são substituídas e os gatilhos recriados.
-
----================================================================================
 --ETAPA 3 GATILHOS E FUNÇÕES
----================================================================================
 
 CREATE OR REPLACE FUNCTION fn_valida_conflito_agenda()
 RETURNS TRIGGER AS $$
@@ -40,9 +35,6 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
--- Podemos verificar se um médico trabalha no horário da consulta. Caso contrário não será possível agendar.
--- Os valores de dia_semana devem ser cadastrados no banco em maiúsculas e sem acento!
 
 CREATE TRIGGER trg_valida_conflito_agenda
 BEFORE INSERT OR UPDATE OF data_hora_marcado, id_medico, id_sala, status
@@ -110,8 +102,6 @@ BEGIN
         v_consulta_new := NEW.id_consulta;
     END IF;
 
-    -- Recalcula a(s) conta(s) afetada(s).
-    -- Se valor_unitario não foi informado, usa o valor cadastrado no procedimento.
     UPDATE conta ct
     SET valor_procedimento = (
         SELECT COALESCE(SUM(cp.quantidade * COALESCE(cp.valor_unitario, p.valor)), 0)
@@ -126,7 +116,7 @@ BEGIN
         WHERE id_consulta IN (v_consulta_old, v_consulta_new)
     );
 
-    RETURN NULL; -- gatilho AFTER: o retorno é ignorado
+    RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -138,12 +128,7 @@ FOR EACH ROW
 EXECUTE FUNCTION fn_atualiza_valor_procedimento_conta();
 
 
--- GATILHO 4: valida o pagamento antes de gravar.
---   * valor_pago é a parte do paciente e valor_convenio a do convênio; nenhum pode ser negativo;
---   * valor_convenio só existe quando possui_convenio é verdadeiro;
---   * com convênio, o paciente da consulta precisa de carteirinha válida na data do pagamento
---     (carteirinha sem validade conta como válida);
---   * a soma de todos os pagamentos da conta não pode passar do total da conta.
+-- GATILHO 4:
 CREATE OR REPLACE FUNCTION fn_valida_pagamento()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -184,8 +169,7 @@ BEGIN
         END IF;
     END IF;
 
-    -- Trava a conta até o fim da transação: dois pagamentos simultâneos não
-    -- conseguem, juntos, passar do total.
+
     SELECT COALESCE(ct.valor_consulta, 0) + COALESCE(ct.valor_procedimento, 0)
       INTO v_total
       FROM conta ct
