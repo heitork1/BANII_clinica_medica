@@ -2,11 +2,6 @@
 
 Aplicação em Python (POO) com três camadas:
 
-| Camada | Pasta | Papel |
-| Apresentação: `apresentacao/` -> Interface Tkinter: cadastro e consulta.
-| Negócio: `negocio/` -> Modelos, validações (CPF, datas, valores) e serviços.
-| Dados: `dados/` ->  Conexão/transação e DAOs com SQL (psycopg2).
-
 As funcionalidades: 
 
 Consultar pagamentos (aba Pagamentos, com filtros por período, forma, convênio, paciente e médico), cadastrar/buscar pacientes (com telefones e, opcionalmente, a carteirinha do convênio), cadastrar/listar médicos (especialidades e horários).
